@@ -32,7 +32,7 @@ In comparison with ECMA55, then apart from all the floaty stuff it's missing
 - RND
 - SQR
 - DEF FN / FN (single or no variable required by ECMA55)
-- PRINT TAB() (SPC() is not ECMA55 not AT)
+- PRINT TAB() (SPC() is not ECMA55 nor AT)
 - READ
 - RESTORE
 - Unquoted data strings
