@@ -376,10 +376,29 @@ jump_linenum(int linenum)
   }
 }
 /*---------------------------------------------------------------------------*/
-static void goto_statement(void)
+static void go_statement(void)
 {
-  accept_tok(TOKENIZER_GOTO);
-  jump_linenum(expr());
+  int linenum;
+
+  accept_tok(TOKENIZER_GO);
+  if (tokenizer_token() == TOKENIZER_TO) {
+    accept_tok(TOKENIZER_TO);
+    linenum = expr();
+    accept_tok(TOKENIZER_CR);
+    jump_linenum(linenum);
+    return;
+  }
+  accept_tok(TOKENIZER_SUB);
+  linenum = expr();
+  accept_tok(TOKENIZER_CR);
+  if(gosub_stack_ptr < MAX_GOSUB_STACK_DEPTH) {
+    gosub_stack[gosub_stack_ptr] = tokenizer_num();
+    gosub_stack_ptr++;
+    jump_linenum(linenum);
+  } else {
+    DEBUG_PRINTF("gosub_statement: gosub stack exhausted\n");
+    /* FIXME: error here */
+  }
 }
 /*---------------------------------------------------------------------------*/
 
@@ -457,21 +476,6 @@ static void let_statement(void)
   DEBUG_PRINTF("let_statement: assign %d to %d\n", variables[var], var);
   accept_tok(TOKENIZER_CR);
 
-}
-/*---------------------------------------------------------------------------*/
-static void gosub_statement(void)
-{
-  int linenum;
-  accept_tok(TOKENIZER_GOSUB);
-  linenum = expr();
-  accept_tok(TOKENIZER_CR);
-  if(gosub_stack_ptr < MAX_GOSUB_STACK_DEPTH) {
-    gosub_stack[gosub_stack_ptr] = tokenizer_num();
-    gosub_stack_ptr++;
-    jump_linenum(linenum);
-  } else {
-    DEBUG_PRINTF("gosub_statement: gosub stack exhausted\n");
-  }
 }
 /*---------------------------------------------------------------------------*/
 static void return_statement(void)
@@ -703,11 +707,8 @@ static void statement(void)
   case TOKENIZER_IF:
     if_statement();
     break;
-  case TOKENIZER_GOTO:
-    goto_statement();
-    break;
-  case TOKENIZER_GOSUB:
-    gosub_statement();
+  case TOKENIZER_GO:
+    go_statement();
     break;
   case TOKENIZER_RETURN:
     return_statement();
