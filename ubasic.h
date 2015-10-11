@@ -37,6 +37,20 @@ typedef int8_t		var_t;
 typedef value_t (*peek_func)(value_t);
 typedef void (*poke_func)(value_t, value_t);
 
+enum type {
+  TYPE_INTEGER,
+  TYPE_STRING
+};
+
+struct typevalue {
+  enum type type;
+  union {
+    value_t i;
+    char *p;
+  } d;
+};
+
+
 void ubasic_init(const char *program);
 void ubasic_init_peek_poke(const char *program, peek_func peek, poke_func poke);
 void ubasic_run(void);
@@ -44,7 +58,7 @@ int ubasic_finished(void);
 
 extern line_t line_num;
 
-value_t ubasic_get_variable(int varnum);
-void ubasic_set_variable(int varum, value_t value);
+void ubasic_get_variable(int varnum, struct typevalue *v);
+void ubasic_set_variable(int varum, struct typevalue *value);
 
 #endif /* __UBASIC_H__ */

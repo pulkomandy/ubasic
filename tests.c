@@ -115,21 +115,28 @@ void run(const char program[]) {
 int
 main(void)
 {
+  struct typevalue v;
   run(program_let);
-  assert(ubasic_get_variable(0) == 42);
+  ubasic_get_variable(0, &v);
+  assert(v.d.i == 42 && v.type == TYPE_INTEGER);
 
   run(program_goto);
-  assert(ubasic_get_variable(2) == 108);
+  ubasic_get_variable(2, &v);
+  assert(v.d.i == 108 && v.type == TYPE_INTEGER);
 
   run(program_loop);
-  assert(ubasic_get_variable(0) == (value_t)(126 * 126 * 10));
+  ubasic_get_variable(0, &v);
+  assert(v.d.i == ((value_t)(126 * 126 * 10)) && v.type == TYPE_INTEGER);
 
   run(program_fibs);
-  assert(ubasic_get_variable(1) == 89);
+  ubasic_get_variable(1, &v);
+  assert(v.d.i == 89 && v.type == TYPE_INTEGER);
 
   run(program_peek_poke);
-  assert(ubasic_get_variable(0) == 123);
-  assert(ubasic_get_variable(25) == 123);
+  ubasic_get_variable(0, &v);
+  assert(v.d.i == 123 && v.type == TYPE_INTEGER);
+  ubasic_get_variable(25, &v);
+  assert(v.d.i == 123 && v.type == TYPE_INTEGER);
 
   return 0;
 }
