@@ -155,9 +155,13 @@ static int get_next_token(void)
 
   if ((*ptr >= 'a' && *ptr <= 'z') || (*ptr >= 'A' && *ptr <= 'Z')) {
     nextptr = ptr + 1;
+    if (*nextptr == '$') {
+      nextptr++;
+      return TOKENIZER_STRINGVAR;
+    }
     if (isdigit(*nextptr))	/* A0-A9/B0-B9/etc */
       nextptr++;
-    return TOKENIZER_VARIABLE;
+    return TOKENIZER_INTVAR;
   }
 
 
@@ -274,6 +278,7 @@ void tokenizer_string_func(stringfunc_t func, void *ctx)
 void
 tokenizer_error_print(void)
 {
+  /* FIXME: print one line only */
   if (line_num)
     fprintf(stderr, "Line %d ", line_num);
   fprintf(stderr, "Syntax error at '%s'\n", ptr);
@@ -289,6 +294,9 @@ tokenizer_finished(void)
 int
 tokenizer_variable_num(void)
 {
+  printf("TVN %c%c\n", *ptr,ptr[1]);
+  if (ptr[1] == '$')
+    return STRINGFLAG | (toupper(*ptr) - 'A');
   /* FIXME: hard code to use &~0x20 as we already know it is a letter */
   if (!isdigit(ptr[1]))
     return toupper(*ptr) - 'A';

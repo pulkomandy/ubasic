@@ -32,7 +32,7 @@
 
 typedef uint16_t	line_t;
 typedef int16_t		value_t;
-typedef int8_t		var_t;
+typedef uint16_t	var_t;
 
 typedef value_t (*peek_func)(value_t);
 typedef void (*poke_func)(value_t, value_t);

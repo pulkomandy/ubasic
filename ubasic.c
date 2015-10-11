@@ -73,6 +73,8 @@ struct line_index *line_index_current = NULL;
 
 #define MAX_VARNUM 26 * 11
 static value_t variables[MAX_VARNUM];
+#define MAX_STRING 26
+static char *strings[MAX_STRING];
 
 static int ended;
 
@@ -153,13 +155,21 @@ static void typecheck_int(struct typevalue *v)
   }
 }
 /*---------------------------------------------------------------------------*/
-/*static void typecheck_string(struct typevalue *v)
+static void typecheck_string(struct typevalue *v)
 {
   if (v->type != TYPE_STRING) {
     fprintf(stderr, "Line %d String required\n", line_num);
     exit(1);
   }
-}*/
+}
+/*---------------------------------------------------------------------------*/
+static void typecheck_same(struct typevalue *l, struct typevalue *r)
+{
+  if (l->type != r->type) {
+    fprintf(stderr, "Line %d Type mismatch\n", line_num);
+    exit(1);
+  }
+}
 /*---------------------------------------------------------------------------*/
 
 static value_t bracketed_intexpr(void)
@@ -174,7 +184,7 @@ static void varfactor(struct typevalue *v)
 {
   DEBUG_PRINTF("varfactor: obtaining %d from variable %d\n", variables[tokenizer_variable_num()], tokenizer_variable_num());
   ubasic_get_variable(tokenizer_variable_num(), v);
-  accept_tok(TOKENIZER_VARIABLE);
+  accept_either(TOKENIZER_INTVAR, TOKENIZER_STRINGVAR);
 }
 /*---------------------------------------------------------------------------*/
 static void factor(struct typevalue *v)
@@ -183,6 +193,11 @@ static void factor(struct typevalue *v)
 
   DEBUG_PRINTF("factor: token %d\n", tokenizer_token());
   switch(t) {
+  case TOKENIZER_STRING:
+    /* FIXME - allocate/copy */
+    v->type = TYPE_STRING;
+    accept_tok(TOKENIZER_STRING);
+    break;
   case TOKENIZER_NUMBER:
     v->d.i = tokenizer_num();
     v->type = TYPE_INTEGER;
@@ -194,13 +209,15 @@ static void factor(struct typevalue *v)
     expr(v);
     accept_tok(TOKENIZER_RIGHTPAREN);
     break;
-  case TOKENIZER_VARIABLE:
+  case TOKENIZER_INTVAR:
+  case TOKENIZER_STRINGVAR:
     varfactor(v);
     break;
   default:
     if (TOKENIZER_NUMEXP(t)) {
       accept_tok(t);
       bracketed_expr(v);
+      typecheck_int(v);
       /* Check v.type at some point */
       switch(t) {
       case TOKENIZER_PEEK:
@@ -241,6 +258,8 @@ static void term(struct typevalue *v)
        op == TOKENIZER_MOD) {
     tokenizer_next();
     factor(&f2);
+    typecheck_int(v);
+    typecheck_int(&f2);
     DEBUG_PRINTF("term: %d %d %d\n", v->d.i, op, f2.d.i);
     switch(op) {
     case TOKENIZER_ASTR:
@@ -280,10 +299,16 @@ static void expr(struct typevalue *v)
        op == TOKENIZER_OR) {
     tokenizer_next();
     term(&t2);
+    if (op != TOKENIZER_PLUS)
+      typecheck_int(v);
+    typecheck_same(v, &t2);
     DEBUG_PRINTF("expr: %d %d %d\n", v->d.i, op, t2.d.i);
     switch(op) {
     case TOKENIZER_PLUS:
-      v->d.i += t2.d.i;
+      if (v->type == TYPE_INTEGER)
+        v->d.i += t2.d.i;
+      else
+        /* FIXME - string cat */;
       break;
     case TOKENIZER_MINUS:
       v->d.i -= t2.d.i;
@@ -313,8 +338,10 @@ static void relation(struct typevalue *r1)
        op == TOKENIZER_EQ) {
     tokenizer_next();
     expr(&r2);
+    typecheck_same(r1, &r2);
     DEBUG_PRINTF("relation: %d %d %d\n", r1->d.i, op, r2.d.i);
     switch(op) {
+    /* FIXME: string versions of these four */
     case TOKENIZER_LT:
       r1->d.i = r1->d.i < r2.d.i;
       break;
@@ -569,11 +596,11 @@ static void let_statement(void)
 
   var = tokenizer_variable_num();
 
-  accept_tok(TOKENIZER_VARIABLE);
+  accept_either(TOKENIZER_INTVAR, TOKENIZER_STRINGVAR);
   accept_tok(TOKENIZER_EQ);
   expr(&v);
-  ubasic_set_variable(var, &v);
   DEBUG_PRINTF("let_statement: assign %d to %d\n", var, v.d.i);
+  ubasic_set_variable(var, &v);
   accept_tok(TOKENIZER_CR);
 
 }
@@ -599,7 +626,7 @@ static void next_statement(void)
      GOTO out of a layer of NEXT the right thing occurs */
   accept_tok(TOKENIZER_NEXT);
   var = tokenizer_variable_num();
-  accept_tok(TOKENIZER_VARIABLE);
+  accept_tok(TOKENIZER_INTVAR);
   
   /* FIXME: make the for stack just use pointers so it compiles better */
   fs = &for_stack[for_stack_ptr - 1];
@@ -634,7 +661,7 @@ static void for_statement(void)
   accept_tok(TOKENIZER_FOR);
   for_variable = tokenizer_variable_num();
   /* FIXME: typecheck the variable */
-  accept_tok(TOKENIZER_VARIABLE);
+  accept_tok(TOKENIZER_INTVAR);
   accept_tok(TOKENIZER_EQ);
   expr(&t);
   typecheck_int(&t);
@@ -778,7 +805,7 @@ static void input_statement(void)
      strings by far ? */
   do {  
     v = tokenizer_variable_num();
-    accept_tok(TOKENIZER_VARIABLE);
+    accept_either(TOKENIZER_INTVAR, TOKENIZER_STRINGVAR);
   
     p = strtok(sp, " ,\t\n");
     sp = NULL;
@@ -865,7 +892,8 @@ static void statement(void)
   case TOKENIZER_LET:
     accept_tok(TOKENIZER_LET);
     /* Fall through. */
-  case TOKENIZER_VARIABLE:
+  case TOKENIZER_STRINGVAR:
+  case TOKENIZER_INTVAR:
     let_statement();
     break;
   default:
@@ -904,15 +932,26 @@ int ubasic_finished(void)
 /*---------------------------------------------------------------------------*/
 void ubasic_set_variable(int varnum, struct typevalue *value)
 {
-  typecheck_int(value);
-  if(varnum >= 0 && varnum <= MAX_VARNUM) {
-    variables[varnum] = value->d.i;
+  if (varnum & STRINGFLAG) {
+    typecheck_string(value);
+    strings[varnum & ~STRINGFLAG] = value->d.p;
+  } else {
+    typecheck_int(value);
+    if(varnum >= 0 && varnum <= MAX_VARNUM)
+      variables[varnum] = value->d.i;
+    else {
+      fprintf(stderr, "BADVW\n");
+      exit(1);
+    }
   }
 }
 /*---------------------------------------------------------------------------*/
 void ubasic_get_variable(int varnum, struct typevalue *value)
 {
-  if(varnum >= 0 && varnum <= MAX_VARNUM) {
+  if (varnum & STRINGFLAG) {
+    value->d.p = strings[varnum & ~STRINGFLAG];
+    value->type = TYPE_STRING;
+  } else if(varnum >= 0 && varnum <= MAX_VARNUM) {
     value->d.i = variables[varnum];
     value->type = TYPE_INTEGER;
   } else {

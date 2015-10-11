@@ -57,12 +57,13 @@ enum {
   TOKENIZER_RESTORE,
   TOKENIZER_TAB,
   TOKENIZER_NUMBER = 192,	/* Numeric expression types */
-  TOKENIZER_VARIABLE,
+  TOKENIZER_INTVAR,
   TOKENIZER_PEEK,	
   TOKENIZER_INT,
   TOKENIZER_ABS,
   TOKENIZER_SGN,
   TOKENIZER_STRING = 224,	/* String expression types */
+  TOKENIZER_STRINGVAR,
   
   /* Tokens that are single symbol assigned to themselves for efficiency */
   TOKENIZER_COMMA = ',',
@@ -85,6 +86,8 @@ enum {
 
 #define TOKENIZER_NUMEXP(x)		(((x) & 0xE0) == 0xC0)
 #define TOKENIZER_STRINGEXP(x)		(((x) & 0xE0) == 0xE0)
+
+#define STRINGFLAG	0x8000
 
 typedef void (*stringfunc_t)(char c, void *ctx);
 void tokenizer_goto(const char *program);
