@@ -28,6 +28,8 @@
  *
  */
 
+#include <stdint.h>
+
 #include "ubasic.h"
 
 static const char program[] =

@@ -28,9 +28,70 @@
  * SUCH DAMAGE.
  *
  */
-#ifndef __VARTYPE_H__
-#define __VARTYPE_H__
 
-#define VARIABLE_TYPE char
+#include <time.h>
+#include <stdio.h>
+#include <assert.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include "ubasic.h"
 
-#endif /* __VARTYPE_H__ */
+/*---------------------------------------------------------------------------*/
+value_t peek(value_t arg) {
+    return arg;
+}
+
+/*---------------------------------------------------------------------------*/
+void poke(value_t arg, value_t value) {
+    assert(arg == value);
+}
+
+/*---------------------------------------------------------------------------*/
+void run(const char program[]) {
+  clock_t start_t, end_t;
+  double delta_t;
+
+  start_t = clock();
+
+  ubasic_init_peek_poke(program, &peek, &poke);
+
+  do {
+    ubasic_run();
+  } while(!ubasic_finished());
+
+  end_t = clock();
+  delta_t = (double)(end_t - start_t) / CLOCKS_PER_SEC;
+
+  printf("done. Run time: %.3f s\n", delta_t);
+}
+
+/*---------------------------------------------------------------------------*/
+
+static char buf[16384];	/* eww */
+
+int main(int argc, char *argv[])
+{
+  int fd, l;
+
+  if (argc != 2) {
+    fprintf(stderr, "%s: program\n", argv[0]);
+    exit(1);
+  }
+  fd = open(argv[1], O_RDONLY);
+  if (fd == -1) {
+    perror(argv[1]);
+    exit(1);
+  }
+  l = read(fd, buf, 16384);
+  if (l == 16384) {
+    fprintf(stderr, "%s is too long\n", argv[1]);
+    exit(1);
+  }
+  close(fd);
+  printf("Loaded %d bytes\n", l);
+  buf[l] = 0;
+  run(buf);
+  return 0;
+}
