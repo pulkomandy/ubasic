@@ -20,9 +20,11 @@ Currently
 - STOP replaces the rather odd "END"
 - ABS() INT() and SGN() are implemented
 - REM works as in normal BASIC
-- DATA is supported but not yet RESTORE/READ !
+- DATA and RESTORE are supported but not yet READ !
 - AND and OR keywords work (but not yet NOT)
 - GOTO and GOSUB allow expressions "computed GOTO")
+- GO SUB and GO TO are two tokens so can be spaced
+- PRINT TAB() (SPC() is not ECMA55 nor is PRINT AT)
 
 In comparison with ECMA55, then apart from all the floaty stuff it's missing
 
@@ -32,11 +34,8 @@ In comparison with ECMA55, then apart from all the floaty stuff it's missing
 - RND
 - SQR
 - DEF FN / FN (single or no variable required by ECMA55)
-- PRINT TAB() (SPC() is not ECMA55 nor AT)
 - READ
-- RESTORE
 - Unquoted data strings
-- GO SUB and GO TO are two tokens so can be spaced
 
 Other useful stuff to add
 
@@ -59,4 +58,5 @@ Other useful stuff to add
 - Command mode
 - CLEAR
 - NEW
+- SAVE / LOAD / CHAIN
 - Unix syscall bindings 8)

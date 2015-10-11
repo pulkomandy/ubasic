@@ -46,6 +46,9 @@
 #include "tokenizer.h"
 
 static char const *ptr, *nextptr;
+static char const *saved_ptr, *saved_next;
+static int saved_token;
+
 
 #define MAX_NUMLEN 6
 
@@ -85,6 +88,8 @@ static const struct keyword_token keywords[] = {
   {"option", TOKENIZER_OPTION},
   {"base", TOKENIZER_BASE},
   {"input", TOKENIZER_INPUT},
+  {"restore", TOKENIZER_RESTORE},
+  {"tab", TOKENIZER_TAB},
   {NULL, TOKENIZER_ERROR}
 };
 
@@ -174,6 +179,20 @@ void tokenizer_init(const char *program)
 int tokenizer_token(void)
 {
   return current_token;
+}
+/*---------------------------------------------------------------------------*/
+void tokenizer_push(void)
+{
+  saved_ptr = ptr;
+  saved_next = nextptr;
+  saved_token = current_token;
+}
+/*---------------------------------------------------------------------------*/
+void tokenizer_pop(void)
+{
+  ptr = saved_ptr;
+  nextptr = saved_next;
+  current_token = saved_token;
 }
 /*---------------------------------------------------------------------------*/
 void tokenizer_next(void)

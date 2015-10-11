@@ -85,6 +85,8 @@ peek_func peek_function = NULL;
 poke_func poke_function = NULL;
 
 line_t line_num;
+static const char *data_position;
+static int data_seek;
 
 static unsigned int array_base = 0;
 
@@ -95,6 +97,8 @@ void ubasic_init(const char *program)
   for_stack_ptr = gosub_stack_ptr = 0;
   index_free();
   tokenizer_init(program);
+  data_position = program_ptr;
+  data_seek = 1;
   ended = 0;
 }
 /*---------------------------------------------------------------------------*/
@@ -109,7 +113,7 @@ void ubasic_init_peek_poke(const char *program, peek_func peek, poke_func poke)
   ended = 0;
 }
 /*---------------------------------------------------------------------------*/
-static uint8_t accept_tok(int token)
+static uint8_t accept_tok(uint8_t token)
 {
   if(token != tokenizer_token()) {
     DEBUG_PRINTF("Token not what was expected (expected %d, got %d)\n",
@@ -122,6 +126,26 @@ static uint8_t accept_tok(int token)
   /* This saves lots of extra calls - return the new token */
   return tokenizer_token();
 }
+/*---------------------------------------------------------------------------*/
+static uint8_t accept_either(uint8_t tok1, uint8_t tok2)
+{
+  uint8_t t = tokenizer_token();
+  if (t == tok2)
+    accept_tok(tok2);
+  else
+    accept_tok(tok1);
+  return t;
+}
+
+static value_t bracketed_expr(void)
+{
+  value_t r;
+  accept_tok(TOKENIZER_LEFTPAREN);
+  r = expr();
+  accept_tok(TOKENIZER_RIGHTPAREN);
+  return r;
+}
+
 /*---------------------------------------------------------------------------*/
 static int varfactor(void)
 {
@@ -155,8 +179,7 @@ static int factor(void)
   default:
     if (TOKENIZER_NUMEXP(t)) {
       accept_tok(t);
-      accept_tok(TOKENIZER_LEFTPAREN);
-      r = expr();
+      r = bracketed_expr();
       switch(t) {
       case TOKENIZER_PEEK:
         r = peek_function(r);
@@ -174,7 +197,6 @@ static int factor(void)
       default:
         fprintf(stderr, "BOGOEXP\n");
       }
-      accept_tok(TOKENIZER_RIGHTPAREN);
     }
     else {
       fprintf(stderr, "Line %d Syntax Error\n", line_num);
@@ -379,16 +401,16 @@ jump_linenum(int linenum)
 static void go_statement(void)
 {
   int linenum;
+  uint8_t t;
 
   accept_tok(TOKENIZER_GO);
-  if (tokenizer_token() == TOKENIZER_TO) {
-    accept_tok(TOKENIZER_TO);
+  t = accept_either(TOKENIZER_TO, TOKENIZER_SUB);
+  if (t == TOKENIZER_TO) {
     linenum = expr();
     accept_tok(TOKENIZER_CR);
     jump_linenum(linenum);
     return;
   }
-  accept_tok(TOKENIZER_SUB);
   linenum = expr();
   accept_tok(TOKENIZER_CR);
   if(gosub_stack_ptr < MAX_GOSUB_STACK_DEPTH) {
@@ -402,36 +424,68 @@ static void go_statement(void)
 }
 /*---------------------------------------------------------------------------*/
 
+static int chpos = 0;
+
 static void charout(char c, void *unused)
 {
+  if (c == '\t') {
+    do {
+      charout(' ', NULL);
+    } while(chpos%8);
+    return;
+  }
   putchar(c);
+  if ((c == 8 || c== 127) && chpos)
+    chpos--;
+  else if (c == '\r' || c == '\n')
+    chpos = 0;
+  else
+    chpos++;
+}
+
+static void charreset(void)
+{
+  chpos = 0;
+}
+
+static void chartab(value_t v)
+{
+  while(chpos < v)
+    charout(' ', NULL);
 }
 
 static void print_statement(void)
 {
   uint8_t nonl;
+  uint8_t t;
+
   accept_tok(TOKENIZER_PRINT);
   do {
+    t = tokenizer_token();
     nonl = 0;
     DEBUG_PRINTF("Print loop\n");
-    if(TOKENIZER_STRINGEXP(tokenizer_token())) {
+    if(TOKENIZER_STRINGEXP(t)) {
       tokenizer_string_func(charout, NULL);
       tokenizer_next();
-    } else if(tokenizer_token() == TOKENIZER_COMMA) {
+    } else if(t == TOKENIZER_COMMA) {
       printf("\t");
       nonl = 1;
       tokenizer_next();
-    } else if(tokenizer_token() == TOKENIZER_SEMICOLON) {
+    } else if(t == TOKENIZER_SEMICOLON) {
       nonl = 1;
       tokenizer_next();
-    } else if(TOKENIZER_NUMEXP(tokenizer_token())) {
-        printf("%d", expr());
-    } else {
-      printf("TOK type %d\n", tokenizer_token());
+    } else if(TOKENIZER_NUMEXP(t)) {
+      printf("%d", expr());
+    } else if(t == TOKENIZER_TAB) {
+      accept_tok(TOKENIZER_TAB);
+      chartab(bracketed_expr());
+    } else if (t != TOKENIZER_CR) {
+      printf("TOK type %c\n", t);
+      /* FIXME: Error out*/
       break;
     }
-  } while(tokenizer_token() != TOKENIZER_CR &&
-      tokenizer_token() != TOKENIZER_ENDOFINPUT);
+  } while(t != TOKENIZER_CR &&
+      t != TOKENIZER_ENDOFINPUT);
   if (!nonl)
     printf("\n");
   DEBUG_PRINTF("End of print\n");
@@ -600,12 +654,7 @@ static void data_statement(void)
       fprintf(stderr, "Line %d, syntax error\n", line_num);
       exit(1);
     }
-    t = tokenizer_token();
-    if (t != TOKENIZER_CR && t != TOKENIZER_COMMA) {
-      fprintf(stderr, "Line %d, syntax error\n", line_num);
-      exit(1);
-    }
-    accept_tok(t);
+    t = accept_either(TOKENIZER_CR, TOKENIZER_COMMA);
   } while(t != TOKENIZER_CR);
 }
 
@@ -671,6 +720,7 @@ static void input_statement(void)
     fprintf(stderr, "EOF\n");
     exit(1);
   }
+  charreset();		/* Newline input so move to left */
 
   /* Consider the single var allowed version of INPUT - it's saner for
      strings by far ? */
@@ -685,13 +735,29 @@ static void input_statement(void)
     else
       r = atoi(p);	/* FIXME: error checking */
     ubasic_set_variable(v, r);
-    t = tokenizer_token();
-    if (t != TOKENIZER_CR)
-      accept_tok(TOKENIZER_COMMA);
+    t = accept_either(TOKENIZER_CR, TOKENIZER_COMMA);
   } while(t != TOKENIZER_CR);
-  accept_tok(TOKENIZER_CR);
 }
 
+/*---------------------------------------------------------------------------*/
+
+void restore_statement(void)
+{
+  int linenum = 0;
+  uint8_t t;
+  t = accept_tok(TOKENIZER_RESTORE);
+  if (t != TOKENIZER_CR)
+    linenum = expr();
+  accept_tok(TOKENIZER_CR);
+  if (linenum) {
+    tokenizer_push();
+    jump_linenum(linenum);
+    data_position = tokenizer_pos();
+    tokenizer_pop();
+  } else
+    data_position = program_ptr;
+  data_seek = 1;
+}
 
 /*---------------------------------------------------------------------------*/
 static void statement(void)
@@ -739,6 +805,9 @@ static void statement(void)
     break;
   case TOKENIZER_INPUT:
     input_statement();
+    break;
+  case TOKENIZER_RESTORE:
+    restore_statement();
     break;
   case TOKENIZER_LET:
     accept_tok(TOKENIZER_LET);

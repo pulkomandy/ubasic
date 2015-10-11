@@ -54,6 +54,8 @@ enum {
   TOKENIZER_OPTION,
   TOKENIZER_BASE,
   TOKENIZER_INPUT,
+  TOKENIZER_RESTORE,
+  TOKENIZER_TAB,
   TOKENIZER_NUMBER = 192,	/* Numeric expression types */
   TOKENIZER_VARIABLE,
   TOKENIZER_PEEK,	
@@ -94,7 +96,8 @@ value_t tokenizer_num(void);
 int tokenizer_variable_num(void);
 void tokenizer_string(char *dest, int len);
 void tokenizer_string_func(stringfunc_t func, void *ctx);
-
+void tokenizer_push(void);
+void tokenizer_pop(void);
 int tokenizer_finished(void);
 void tokenizer_error_print(void);
 
