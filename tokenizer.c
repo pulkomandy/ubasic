@@ -237,24 +237,27 @@ value_t tokenizer_num(void)
   return atoi(ptr);
 }
 /*---------------------------------------------------------------------------*/
-void tokenizer_string(char *dest, int len)
+int tokenizer_string_len(void)
 {
   char *string_end;
-  int string_len;
 
   if(tokenizer_token() != TOKENIZER_STRING) {
-    return;
+    fprintf(stderr, "strlbotch");
+    exit(1);
   }
   string_end = strchr(ptr + 1, '"');
   if(string_end == NULL) {
-    return;
+    /* Syntax error ? */
+    fprintf(stderr, "strlbotch2");
+    exit(1);
   }
-  string_len = string_end - ptr - 1;
-  if(len < string_len) {
-    string_len = len;
-  }
-  memcpy(dest, ptr + 1, string_len);
-  dest[string_len] = 0;
+  return string_end - ptr - 1;
+}
+
+/*---------------------------------------------------------------------------*/
+char const *tokenizer_string(void)
+{
+  return ptr + 1;
 }
 
 /*---------------------------------------------------------------------------*/
@@ -294,7 +297,6 @@ tokenizer_finished(void)
 int
 tokenizer_variable_num(void)
 {
-  printf("TVN %c%c\n", *ptr,ptr[1]);
   if (ptr[1] == '$')
     return STRINGFLAG | (toupper(*ptr) - 'A');
   /* FIXME: hard code to use &~0x20 as we already know it is a letter */

@@ -46,7 +46,7 @@ struct typevalue {
   enum type type;
   union {
     value_t i;
-    char *p;
+    uint8_t *p;
   } d;
 };
 

@@ -74,7 +74,7 @@ struct line_index *line_index_current = NULL;
 #define MAX_VARNUM 26 * 11
 static value_t variables[MAX_VARNUM];
 #define MAX_STRING 26
-static char *strings[MAX_STRING];
+static uint8_t *strings[MAX_STRING];
 
 static int ended;
 
@@ -171,6 +171,33 @@ static void typecheck_same(struct typevalue *l, struct typevalue *r)
   }
 }
 /*---------------------------------------------------------------------------*/
+/* Temoporary implementation of string workspaces */
+
+static uint8_t stringblob[512];
+static uint8_t *nextstr;
+
+static uint8_t *string_temp(int len)
+{
+  uint8_t *p = nextstr;
+  if (len > 255) {
+    fprintf(stderr, "Line %d String too long\n", line_num);
+    exit(1);
+  }
+  nextstr += len + 1;
+  if (nextstr > stringblob + sizeof(stringblob)) {
+    fprintf(stderr, "Line %d Out of string temporaries\n", line_num);
+    exit(1);
+  }
+  *p = len;
+  return p;
+}
+
+static void string_temp_free(void)
+{
+  nextstr = stringblob;
+}
+
+/*---------------------------------------------------------------------------*/
 
 static value_t bracketed_intexpr(void)
 {
@@ -182,20 +209,25 @@ static value_t bracketed_intexpr(void)
 /*---------------------------------------------------------------------------*/
 static void varfactor(struct typevalue *v)
 {
-  DEBUG_PRINTF("varfactor: obtaining %d from variable %d\n", variables[tokenizer_variable_num()], tokenizer_variable_num());
   ubasic_get_variable(tokenizer_variable_num(), v);
+  DEBUG_PRINTF("varfactor: obtaining %d from variable %d\n", v->d.i, tokenizer_variable_num());
   accept_either(TOKENIZER_INTVAR, TOKENIZER_STRINGVAR);
 }
 /*---------------------------------------------------------------------------*/
 static void factor(struct typevalue *v)
 {
   uint8_t t = tokenizer_token();
+  int len;
 
   DEBUG_PRINTF("factor: token %d\n", tokenizer_token());
   switch(t) {
   case TOKENIZER_STRING:
     /* FIXME - allocate/copy */
     v->type = TYPE_STRING;
+    len = tokenizer_string_len();
+    v->d.p = string_temp(len);
+    memcpy(v->d.p + 1, tokenizer_string(), len);
+    DEBUG_PRINTF("factor: string %p\n", v->d.p);
     accept_tok(TOKENIZER_STRING);
     break;
   case TOKENIZER_NUMBER:
@@ -365,13 +397,13 @@ static value_t intexpr(void)
   return t.d.i;
 }
 /*---------------------------------------------------------------------------*/
-/*static char *stringexpr(void)
+static uint8_t *stringexpr(void)
 {
   struct typevalue t;
   expr(&t);
   typecheck_string(&t);
   return t.d.p;
-}*/
+}
 /*---------------------------------------------------------------------------*/
 static void index_free(void) {
   if(line_index_head != NULL) {
@@ -525,6 +557,13 @@ static void chartab(value_t v)
     charout(' ', NULL);
 }
 
+static void charoutstr(uint8_t *p)
+{
+  int len =*p++;
+  while(len--)
+    charout(*p++, NULL);
+}
+
 static void print_statement(void)
 {
   uint8_t nonl;
@@ -535,9 +574,12 @@ static void print_statement(void)
     t = tokenizer_token();
     nonl = 0;
     DEBUG_PRINTF("Print loop\n");
-    if(TOKENIZER_STRINGEXP(t)) {
+    if(t == TOKENIZER_STRING) {
+      /* Handle string const specially - length rules */
       tokenizer_string_func(charout, NULL);
       tokenizer_next();
+    } else if(TOKENIZER_STRINGEXP(t)) {
+      charoutstr(stringexpr());
     } else if(t == TOKENIZER_COMMA) {
       printf("\t");
       nonl = 1;
@@ -844,6 +886,8 @@ static void statement(void)
 {
   int token;
 
+  string_temp_free();
+
   token = tokenizer_token();
 
   switch(token) {
@@ -930,11 +974,28 @@ int ubasic_finished(void)
   return ended || tokenizer_finished();
 }
 /*---------------------------------------------------------------------------*/
+
+/* This helper will change once we try and stamp out malloc but will do for
+   the moment */
+static uint8_t *string_save(uint8_t *p)
+{
+  uint8_t *b = malloc(*p + 1);
+  if (b == NULL) {
+    fprintf(stderr, "Out of memory.\n");
+    exit(1);
+  }
+  memcpy(b, p, *p + 1);
+  return b;
+}
+
 void ubasic_set_variable(int varnum, struct typevalue *value)
 {
   if (varnum & STRINGFLAG) {
     typecheck_string(value);
-    strings[varnum & ~STRINGFLAG] = value->d.p;
+    varnum &= ~STRINGFLAG;
+    if (strings[varnum])
+      free(strings[varnum]);
+    strings[varnum] = string_save(value->d.p);
   } else {
     typecheck_int(value);
     if(varnum >= 0 && varnum <= MAX_VARNUM)
