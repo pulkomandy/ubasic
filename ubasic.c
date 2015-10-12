@@ -44,6 +44,7 @@
 #include <stdint.h> /* Types */
 #include <string.h>
 #include <time.h>
+#include <ctype.h>
 #include <unistd.h>
 
 #include "ubasic.h"
@@ -78,6 +79,7 @@ struct line_index *line_index_current = NULL;
 static value_t variables[MAX_VARNUM];
 #define MAX_STRING 26
 static uint8_t *strings[MAX_STRING];
+static uint8_t nullstr[1] = { 0 };
 
 static int ended;
 
@@ -98,6 +100,7 @@ static unsigned int array_base = 0;
 /*---------------------------------------------------------------------------*/
 void ubasic_init(const char *program)
 {
+  int i;
   program_ptr = program;
   for_stack_ptr = gosub_stack_ptr = 0;
   index_free();
@@ -105,17 +108,15 @@ void ubasic_init(const char *program)
   data_position = program_ptr;
   data_seek = 1;
   ended = 0;
+  for (i = 0; i < 26; i++)
+    strings[i] = nullstr;
 }
 /*---------------------------------------------------------------------------*/
 void ubasic_init_peek_poke(const char *program, peek_func peek, poke_func poke)
 {
-  program_ptr = program;
-  for_stack_ptr = gosub_stack_ptr = 0;
-  index_free();
   peek_function = peek;
   poke_function = poke;
-  tokenizer_init(program);
-  ended = 0;
+  ubasic_init(program);
 }
 /*---------------------------------------------------------------------------*/
 void ubasic_error(const char *err)
@@ -203,19 +204,83 @@ static uint8_t *string_temp(int len)
   *p = len;
   return p;
 }
-
+/*---------------------------------------------------------------------------*/
 static void string_temp_free(void)
 {
   nextstr = stringblob;
 }
 /*---------------------------------------------------------------------------*/
-
+static void string_cut(struct typevalue *o, struct typevalue *t, value_t l, value_t n)
+{
+  uint8_t *p = t->d.p;
+  int f = *p;
+  /* Strings start at 1 ... */
+  
+  if (l > f)	/* Nothing to cut */
+    o->d.p = string_temp(0);
+  else {
+    f -= l - 1;
+    if (f < n)
+      n = f;
+    o->d.p = string_temp(n);
+    memcpy(o->d.p+1, p + l, n);
+  }
+  o->type = TYPE_STRING;
+}  
+/*---------------------------------------------------------------------------*/
+static void string_cut_r(struct typevalue *o, struct typevalue *t, value_t r)
+{
+  int f = *t->d.p;
+  f -= r;
+  if (f <= 0) {
+    o->d.p = string_temp(0);
+    o->type = TYPE_STRING;
+  } else
+    string_cut(o, t, f + 1, r);
+}
+/*---------------------------------------------------------------------------*/
+static value_t string_val(struct typevalue *t)
+{
+  uint8_t *p = t->d.p;
+  uint8_t l = *p++;
+  uint8_t neg = 0;
+  value_t n = 0;
+  if (*p == '-') {
+    neg = 1;
+    p++;
+    l--;
+  }
+  if (l == 0)
+    ubasic_error(badtype);
+  while(l) {
+    if (!isdigit(*p))
+      ubasic_error(badtype);
+    n = 10 * n + *p++ - '0';
+    l--;
+  }
+  return neg ? -n : n;
+}
+/*---------------------------------------------------------------------------*/
 static value_t bracketed_intexpr(void)
 {
   struct typevalue v;
   bracketed_expr(&v);
   typecheck_int(&v);
   return v.d.i;
+}
+/*---------------------------------------------------------------------------*/
+static void funcexpr(struct typevalue *t, const char *f)
+{
+  accept_tok(TOKENIZER_LEFTPAREN);
+  while(*f) {
+    expr(t);
+    if (*f != t->type)
+      ubasic_error(badtype);
+    if (*++f)
+      accept_tok(TOKENIZER_COMMA);
+    t++;
+  }
+  accept_tok(TOKENIZER_RIGHTPAREN);
 }
 /*---------------------------------------------------------------------------*/
 static void varfactor(struct typevalue *v)
@@ -229,6 +294,7 @@ static void factor(struct typevalue *v)
 {
   uint8_t t = tokenizer_token();
   int len;
+  struct typevalue arg[3];
 
   DEBUG_PRINTF("factor: token %d\n", tokenizer_token());
   switch(t) {
@@ -258,25 +324,70 @@ static void factor(struct typevalue *v)
   default:
     if (TOKENIZER_NUMEXP(t)) {
       accept_tok(t);
-      bracketed_expr(v);
-      typecheck_int(v);
-      /* Check v.type at some point */
       switch(t) {
       case TOKENIZER_PEEK:
-        v->d.i = peek_function(v->d.i);
+        funcexpr(arg,"I");
+        v->d.i = peek_function(arg[0].d.i);
         break;
       case TOKENIZER_ABS:
+        funcexpr(arg,"I");
+        v->d.i = arg[0].d.i;
         if (v->d.i < 0)
           v->d.i = -v->d.i;
         break;
       case TOKENIZER_INT:
+        funcexpr(arg,"I");
+        v->d.i = arg[0].d.i;
         break;
       case TOKENIZER_SGN:
+        funcexpr(arg,"I");
+        v->d.i = arg[0].d.i;
         if (v->d.i > 1 ) v->d.i = 1;
         if (v->d.i < 0) v->d.i = -1;
         break;
+      case TOKENIZER_LEN:
+        funcexpr(arg,"S");
+        v->d.i = *arg[0].d.p;
+        break;
+      case TOKENIZER_CODE:
+        funcexpr(arg,"S");
+        if (*arg[0].d.p)
+          v->d.i = arg[0].d.p[1];
+        else
+          v->d.i = 0;
+        break;
+      case TOKENIZER_VAL:
+        funcexpr(arg,"S");
+        v->d.i = string_val(&arg[0]);
+        break;
       default:
-        ubasic_error("INT1");
+        ubasic_error(syntax);
+      }
+      v->type = TYPE_INTEGER;
+    }
+    else if (TOKENIZER_STRINGEXP(t)) {
+      accept_tok(t);
+      switch(t) {
+      case TOKENIZER_LEFTSTR:
+        funcexpr(arg, "SI");
+        string_cut(v, &arg[0], 1, arg[1].d.i);
+        break;
+      case TOKENIZER_RIGHTSTR:
+        funcexpr(arg, "SI");
+        string_cut_r(v, &arg[0], arg[1].d.i);
+        break;
+      case TOKENIZER_MIDSTR:
+        funcexpr(arg, "SII");
+        string_cut(v, &arg[0], arg[1].d.i, arg[2].d.i);
+        break;
+      case TOKENIZER_CHRSTR:
+        funcexpr(arg, "I");
+        v->d.p = string_temp(2);
+        v->d.p[1] = arg[0].d.i;
+        v->type = TYPE_STRING;
+        break;
+      default:
+        ubasic_error(syntax);
       }
     }
     else
@@ -1043,7 +1154,7 @@ void ubasic_set_variable(int varnum, struct typevalue *value)
   if (varnum & STRINGFLAG) {
     typecheck_string(value);
     varnum &= ~STRINGFLAG;
-    if (strings[varnum])
+    if (strings[varnum] != nullstr)
       free(strings[varnum]);
     strings[varnum] = string_save(value->d.p);
   } else {

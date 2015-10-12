@@ -65,9 +65,15 @@ enum {
   TOKENIZER_INT,
   TOKENIZER_ABS,
   TOKENIZER_SGN,
+  TOKENIZER_LEN,
+  TOKENIZER_CODE,
+  TOKENIZER_VAL,
   TOKENIZER_STRING = 224,	/* String expression types */
   TOKENIZER_STRINGVAR,
-  
+  TOKENIZER_LEFTSTR,
+  TOKENIZER_RIGHTSTR,
+  TOKENIZER_MIDSTR,
+  TOKENIZER_CHRSTR,
   /* Tokens that are single symbol assigned to themselves for efficiency */
   TOKENIZER_COMMA = ',',
   TOKENIZER_SEMICOLON = ';',

@@ -38,8 +38,8 @@ typedef value_t (*peek_func)(value_t);
 typedef void (*poke_func)(value_t, value_t);
 
 enum type {
-  TYPE_INTEGER,
-  TYPE_STRING
+  TYPE_INTEGER = 'I',
+  TYPE_STRING = 'S'
 };
 
 struct typevalue {

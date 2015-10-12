@@ -78,7 +78,10 @@ static const struct keyword_token keywords[] = {
   {"peek", TOKENIZER_PEEK},
   {"int", TOKENIZER_INT},
   {"abs", TOKENIZER_ABS},
-  {"sgn", TOKENIZER_ABS},
+  {"sgn", TOKENIZER_SGN},
+  {"len", TOKENIZER_LEN},
+  {"code", TOKENIZER_CODE},
+  {"val", TOKENIZER_VAL},
   {"stop", TOKENIZER_STOP},
   {"and", TOKENIZER_AND},
   {"or", TOKENIZER_OR},
@@ -90,6 +93,10 @@ static const struct keyword_token keywords[] = {
   {"input", TOKENIZER_INPUT},
   {"restore", TOKENIZER_RESTORE},
   {"tab", TOKENIZER_TAB},
+  {"left$", TOKENIZER_LEFTSTR},
+  {"right$", TOKENIZER_RIGHTSTR},
+  {"mid$", TOKENIZER_MIDSTR},
+  {"chr$", TOKENIZER_CHRSTR},
   {NULL, TOKENIZER_ERROR}
 };
 

@@ -25,11 +25,16 @@ Currently
 - GOTO and GOSUB allow expressions "computed GOTO")
 - GO SUB and GO TO are two tokens so can be spaced
 - PRINT TAB() (SPC() is not ECMA55 nor is PRINT AT)
+- String variables (A$-Z$ required)
+- LEFT$(), RIGHT$(), MID$(), CHR$()
+- VAL(),CODE()
+- LEN()
 
 In comparison with ECMA55, then apart from all the floaty stuff it's missing
 
+- Proper print parsing (we allow PRINT A$B$C$ without ; or , - this is bad
+  as it makes mistyped functions *weird* to debug)
 - Arrays (1 or 2 dimensions required by ECMA55)
-- String variables (A$-Z$ required)
 - The ^ operator (or ** equivalent)
 - RND
 - SQR
@@ -38,12 +43,8 @@ In comparison with ECMA55, then apart from all the floaty stuff it's missing
 - Unquoted data strings
 
 Other useful stuff to add
-
 - XOR
-- LEFT$(), RIGHT$(), MID$(), CHR$()
-- VAL(),CODE()
 - USR()
-- LEN()
 - INKEY$
 - CLS
 - ON expr GO TO/SUB  ... {ELSE}
