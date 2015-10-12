@@ -865,10 +865,9 @@ static void input_statement(void)
 {
   struct typevalue r;
   var_t v;
-  char buf[128];
-  char *p;
-  char *sp = buf;
+  char buf[129];
   uint8_t t;
+  int l;
   
   accept_tok(TOKENIZER_INPUT);
 
@@ -885,28 +884,37 @@ static void input_statement(void)
     charout('?', NULL);
     charout(' ', NULL);
   }
-  if (fgets(buf, 128, stdin) == NULL) {
-    fprintf(stderr, "EOF\n");
-    exit(1);
-  }
-  charreset();		/* Newline input so move to left */
 
   /* Consider the single var allowed version of INPUT - it's saner for
      strings by far ? */
   do {  
+    t = tokenizer_token();
     v = tokenizer_variable_num();
     accept_either(TOKENIZER_INTVAR, TOKENIZER_STRINGVAR);
-  
-    p = strtok(sp, " ,\t\n");
-    sp = NULL;
-    r.type = TYPE_INTEGER;	/* For now */
-    if (p == NULL)
-      r.d.i = 0;
-    else
-      r.d.i = atoi(p);	/* FIXME: error checking */
+
+    if (fgets(buf + 1, 128, stdin) == NULL) {
+      fprintf(stderr, "EOF\n");
+      exit(1);
+    }
+    charreset();		/* Newline input so move to left */
+    if (t == TOKENIZER_INTVAR) {
+      r.type = TYPE_INTEGER;	/* For now */
+      r.d.i = atoi(buf + 1);	/* FIXME: error checking */
+    } else {
+      /* Turn a C string into a BASIC one */
+      r.type = TYPE_STRING;
+      l = strlen(buf + 1);
+      if (buf[l] == '\n')
+        l--;
+      *((uint8_t *)buf) = l;
+      r.d.p = (uint8_t *)buf;
+    }
     ubasic_set_variable(v, &r);
-    t = accept_either(TOKENIZER_CR, TOKENIZER_COMMA);
+    t = tokenizer_token();
+    if (t != TOKENIZER_CR)
+      t = accept_either(TOKENIZER_COMMA, TOKENIZER_SEMICOLON);
   } while(t != TOKENIZER_CR);
+  accept_tok(TOKENIZER_CR);
 }
 
 /*---------------------------------------------------------------------------*/
