@@ -29,12 +29,13 @@ Currently
 - LEFT$(), RIGHT$(), MID$(), CHR$()
 - VAL(),CODE()
 - LEN()
+- Proper print parsing (we don't allow PRINT ABC printing A then B then C.
+  You must as in normal basic use ; or , .
 
 In comparison with ECMA55, then apart from all the floaty stuff it's missing
 
-- Proper print parsing (we allow PRINT A$B$C$ without ; or , - this is bad
-  as it makes mistyped functions *weird* to debug)
-- Arrays (1 or 2 dimensions required by ECMA55)
+- IF operators for relation AND/OR relation are messed up
+- Arrays (1 or 2 dimensions required by ECMA55). Implicit dimensioning too
 - The ^ operator (or ** equivalent)
 - RND
 - SQR
