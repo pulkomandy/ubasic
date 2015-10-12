@@ -31,6 +31,12 @@ Currently
 - LEN()
 - Proper print parsing (we don't allow PRINT ABC printing A then B then C.
   You must as in normal basic use ; or , .
+- Faster RETURN and loops - we save the tokenizer pointer rather than mucking
+  about playing hunt the line number
+- Statements can be separated by :
+- Removed the existing IF THEN ELSE in favour of a traditional IF THEN and
+  : usage (IF THEN IF THEN ELSE ELSE ... gets horrible to parse and the old
+  code messed it up badly)
 
 In comparison with ECMA55, then apart from all the floaty stuff it's missing
 
@@ -52,7 +58,6 @@ Other useful stuff to add
 - ON ERROR
 - ON TIMER/SIGNAL
 - PAUSE
-- Use of ":"
 - Short tokens "P." etc
 - DO WHILE
 - DO UNTIL
@@ -62,3 +67,4 @@ Other useful stuff to add
 - NEW
 - SAVE / LOAD / CHAIN
 - Unix syscall bindings 8)
+- Unify GOSUB/NEXT/etc stack so that RETURN wipes out next frames etc

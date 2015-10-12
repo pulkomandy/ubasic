@@ -118,7 +118,7 @@ static uint8_t doublechar(void)
 /*---------------------------------------------------------------------------*/
 static uint8_t singlechar(void)
 {
-  if (strchr("\n,;+-&|*/%(#)<>=^", *ptr))
+  if (strchr("\n,;+-&|*/%(#)<>=^:", *ptr))
     return *ptr;
   /* Not semantically meaningful */
   return 0;
@@ -252,9 +252,6 @@ void tokenizer_newline(void)
 {
    while(!(*nextptr == '\n' || tokenizer_finished())) {
      ++nextptr;
-  }
-  if(*nextptr == '\n') {
-    ++nextptr;
   }
   tokenizer_next();
 }

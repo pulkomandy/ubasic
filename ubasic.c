@@ -53,11 +53,11 @@
 static char const *program_ptr;
 
 #define MAX_GOSUB_STACK_DEPTH 10
-static line_t gosub_stack[MAX_GOSUB_STACK_DEPTH];
+static char const *gosub_stack[MAX_GOSUB_STACK_DEPTH];
 static int gosub_stack_ptr;
 
 struct for_state {
-  line_t line_after_for;
+  char const *resume_token;	/* Token to resume execution at */
   var_t for_variable;
   value_t to;
   value_t step;
@@ -84,8 +84,9 @@ static uint8_t nullstr[1] = { 0 };
 static int ended;
 
 static void expr(struct typevalue *val);
-static void line_statement(void);
-static void statement(void);
+static void line_statements(void);
+static void statements(void);
+static uint8_t statement(void);
 static void index_free(void);
 
 peek_func peek_function = NULL;
@@ -163,7 +164,17 @@ static uint8_t accept_either(uint8_t tok1, uint8_t tok2)
     accept_tok(tok1);
   return t;
 }
+/*---------------------------------------------------------------------------*/
+static int statement_end(void)
+{
+  uint8_t t = tokenizer_token();
+  /* FIXME?? END OF FILE */
+  if (t == TOKENIZER_CR || t == TOKENIZER_COLON)
+    return 1;
+  return 0;
+}
 
+/*---------------------------------------------------------------------------*/
 static void bracketed_expr(struct typevalue *v)
 {
   accept_tok(TOKENIZER_LEFTPAREN);
@@ -589,7 +600,7 @@ static void index_free(void) {
   }
 }
 /*---------------------------------------------------------------------------*/
-static char const*index_find(int linenum) {
+static char const *index_find(int linenum) {
   #if DEBUG
   int step = 0;
   #endif
@@ -677,18 +688,20 @@ static void go_statement(void)
   int linenum;
   uint8_t t;
 
-  accept_tok(TOKENIZER_GO);
   t = accept_either(TOKENIZER_TO, TOKENIZER_SUB);
   if (t == TOKENIZER_TO) {
     linenum = intexpr();
-    accept_tok(TOKENIZER_CR);
+    if (!statement_end())
+      ubasic_error(syntax);
     jump_linenum(linenum);
     return;
   }
   linenum = intexpr();
-  accept_tok(TOKENIZER_CR);
+  if (!statement_end())
+    ubasic_error(syntax);
+
   if(gosub_stack_ptr < MAX_GOSUB_STACK_DEPTH) {
-    gosub_stack[gosub_stack_ptr] = tokenizer_num();
+    gosub_stack[gosub_stack_ptr] = tokenizer_pos();
     gosub_stack_ptr++;
     jump_linenum(linenum);
   } else {
@@ -750,7 +763,6 @@ static void print_statement(void)
   uint8_t t;
   uint8_t nv = 0;
 
-  accept_tok(TOKENIZER_PRINT);
   do {
     t = tokenizer_token();
     nonl = 0;
@@ -785,41 +797,28 @@ static void print_statement(void)
     } else if(t == TOKENIZER_SEMICOLON) {
       nonl = 1;
       tokenizer_next();
-    } else if (t != TOKENIZER_CR) {
+    } else if (!statement_end()) {
       ubasic_error(syntax);
       break;
     }
-  } while(t != TOKENIZER_CR &&
-      t != TOKENIZER_ENDOFINPUT);
+  } while(!statement_end());
   if (!nonl)
     charout('\n', 0);
   DEBUG_PRINTF("End of print\n");
-  tokenizer_next();
 }
 /*---------------------------------------------------------------------------*/
 static void if_statement(void)
 {
   struct typevalue r;
 
-  accept_tok(TOKENIZER_IF);
-
   relation(&r);
   DEBUG_PRINTF("if_statement: relation %d\n", r.d.i);
+  /* FIXME allow THEN number */
   accept_tok(TOKENIZER_THEN);
   if(r.d.i) {
-    statement();
+    statements();
   } else {
-    do {
-      tokenizer_next();
-    } while(tokenizer_token() != TOKENIZER_ELSE &&
-        tokenizer_token() != TOKENIZER_CR &&
-        tokenizer_token() != TOKENIZER_ENDOFINPUT);
-    if(tokenizer_token() == TOKENIZER_ELSE) {
-      tokenizer_next();
-      statement();
-    } else if(tokenizer_token() == TOKENIZER_CR) {
-      tokenizer_next();
-    }
+    tokenizer_newline();
   }
 }
 /*---------------------------------------------------------------------------*/
@@ -835,16 +834,13 @@ static void let_statement(void)
   expr(&v);
   DEBUG_PRINTF("let_statement: assign %d to %d\n", var, v.d.i);
   ubasic_set_variable(var, &v);
-  accept_tok(TOKENIZER_CR);
-
 }
 /*---------------------------------------------------------------------------*/
 static void return_statement(void)
 {
-  accept_tok(TOKENIZER_RETURN);
   if(gosub_stack_ptr > 0) {
     gosub_stack_ptr--;
-    jump_linenum(gosub_stack[gosub_stack_ptr]);
+    tokenizer_goto(gosub_stack[gosub_stack_ptr]);
   } else {
     DEBUG_PRINTF("return_statement: non-matching return\n");
   }
@@ -858,7 +854,6 @@ static void next_statement(void)
 
   /* FIXME: support 'NEXT' on its own, also loop down the stack so if you
      GOTO out of a layer of NEXT the right thing occurs */
-  accept_tok(TOKENIZER_NEXT);
   var = tokenizer_variable_num();
   accept_tok(TOKENIZER_INTVAR);
   
@@ -871,12 +866,10 @@ static void next_statement(void)
     ubasic_set_variable(var, &t);
     /* NEXT end depends upon sign of STEP */
     if ((fs->step >= 0 && t.d.i <= fs->to) ||
-        (fs->step < 0 && t.d.i >= fs->to)) {
-      jump_linenum(fs->line_after_for);
-    } else {
+        (fs->step < 0 && t.d.i >= fs->to))
+      tokenizer_goto(fs->resume_token);
+    else
       for_stack_ptr--;
-      accept_tok(TOKENIZER_CR);
-    }
   } else
     ubasic_error("Mismatched NEXT");
 }
@@ -887,7 +880,6 @@ static void for_statement(void)
   value_t to, step = 1;
   struct typevalue t;
 
-  accept_tok(TOKENIZER_FOR);
   for_variable = tokenizer_variable_num();
   accept_tok(TOKENIZER_INTVAR);
   accept_tok(TOKENIZER_EQ);
@@ -901,11 +893,13 @@ static void for_statement(void)
     accept_tok(TOKENIZER_STEP);
     step = intexpr();
   }
-  accept_tok(TOKENIZER_CR);
-
+  if (!statement_end())
+    ubasic_error(syntax);
+  /* Save a pointer to the : or CR, when we return to statements it
+     will do the right thing */
   if(for_stack_ptr < MAX_FOR_STACK_DEPTH) {
     struct for_state *fs = &for_stack[for_stack_ptr];
-    fs->line_after_for = tokenizer_num();
+    fs->resume_token = tokenizer_pos();
     fs->for_variable = for_variable;
     fs->to = to;
     fs->step = step;
@@ -925,25 +919,20 @@ static void poke_statement(void)
   value_t poke_addr;
   value_t value;
 
-  accept_tok(TOKENIZER_POKE);
   poke_addr = intexpr();
   accept_tok(TOKENIZER_COMMA);
   value = intexpr();
-  accept_tok(TOKENIZER_CR);
 
   poke_function(poke_addr, value);
 }
 /*---------------------------------------------------------------------------*/
 static void stop_statement(void)
 {
-  accept_tok(TOKENIZER_STOP);
-  accept_tok(TOKENIZER_CR);
   ended = 1;
 }
 /*---------------------------------------------------------------------------*/
 static void rem_statement(void)
 {
-  accept_tok(TOKENIZER_REM);
   tokenizer_newline();
 }
 
@@ -951,7 +940,6 @@ static void rem_statement(void)
 static void data_statement(void)
 {
   uint8_t t;
-  accept_tok(TOKENIZER_DATA);
   do {
     t = tokenizer_token();
     /* We could just as easily allow expressions which might be wild... */
@@ -960,7 +948,11 @@ static void data_statement(void)
       tokenizer_next();
     else
       ubasic_error(syntax);
-    t = accept_either(TOKENIZER_CR, TOKENIZER_COMMA);
+    t = tokenizer_token();
+    if (t == TOKENIZER_COMMA)
+      accept_tok(t);
+    else if (!statement_end())
+      ubasic_error(syntax);
   } while(t != TOKENIZER_CR);
 }
 
@@ -968,7 +960,6 @@ static void data_statement(void)
 static void randomize_statement(void)
 {
   value_t r = 0;
-  accept_tok(TOKENIZER_RANDOMIZE);
   /* FIXME: replace all the CR checks with TOKENIZER_EOS() or similar so we
      can deal with ':' */
   if (tokenizer_token() != TOKENIZER_CR)
@@ -977,7 +968,6 @@ static void randomize_statement(void)
     srand(getpid()^getuid()^time(NULL));
   else
     srand(r);
-  accept_tok(TOKENIZER_CR);
 }
 
 /*---------------------------------------------------------------------------*/
@@ -985,10 +975,8 @@ static void randomize_statement(void)
 static void option_statement(void)
 {
   value_t r;
-  accept_tok(TOKENIZER_OPTION);
   accept_tok(TOKENIZER_BASE);
   r = intexpr();
-  accept_tok(TOKENIZER_CR);
   if (r < 0 || r > 1)
     ubasic_error("Invalid base");
   array_base = r;
@@ -1002,19 +990,15 @@ static void input_statement(void)
   var_t v;
   char buf[129];
   uint8_t t;
+  uint8_t first = 1;
   int l;
   
-  accept_tok(TOKENIZER_INPUT);
-
   t = tokenizer_token();
   if (TOKENIZER_STRINGEXP(t)) {
     tokenizer_string_func(charout, NULL);
     tokenizer_next();
     t = tokenizer_token();
-    if (t == TOKENIZER_COMMA)
-      accept_tok(TOKENIZER_COMMA);
-    else
-      accept_tok(TOKENIZER_SEMICOLON);	/* accept_tok_pair needed  ? */
+    first = 0;
   } else {
     charout('?', NULL);
     charout(' ', NULL);
@@ -1023,6 +1007,9 @@ static void input_statement(void)
   /* Consider the single var allowed version of INPUT - it's saner for
      strings by far ? */
   do {  
+    if (!first)
+      accept_either(TOKENIZER_COMMA, TOKENIZER_SEMICOLON);
+    first = 0;
     t = tokenizer_token();
     v = tokenizer_variable_num();
     accept_either(TOKENIZER_INTVAR, TOKENIZER_STRINGVAR);
@@ -1045,10 +1032,7 @@ static void input_statement(void)
       r.d.p = (uint8_t *)buf;
     }
     ubasic_set_variable(v, &r);
-    t = tokenizer_token();
-    if (t != TOKENIZER_CR)
-      t = accept_either(TOKENIZER_COMMA, TOKENIZER_SEMICOLON);
-  } while(t != TOKENIZER_CR);
+  } while(!statement_end());
   accept_tok(TOKENIZER_CR);
 }
 
@@ -1056,11 +1040,8 @@ static void input_statement(void)
 void restore_statement(void)
 {
   int linenum = 0;
-  uint8_t t;
-  t = accept_tok(TOKENIZER_RESTORE);
-  if (t != TOKENIZER_CR)
+  if (!statement_end())
     linenum = intexpr();
-  accept_tok(TOKENIZER_CR);
   if (linenum) {
     tokenizer_push();
     jump_linenum(linenum);
@@ -1072,13 +1053,16 @@ void restore_statement(void)
 }
 
 /*---------------------------------------------------------------------------*/
-static void statement(void)
+static uint8_t statement(void)
 {
   int token;
 
   string_temp_free();
 
   token = tokenizer_token();
+  /* LET may be omitted.. */
+  if (token != TOKENIZER_INTVAR && token != TOKENIZER_STRINGVAR)
+    accept_tok(token);
 
   switch(token) {
   case TOKENIZER_PRINT:
@@ -1089,7 +1073,7 @@ static void statement(void)
     break;
   case TOKENIZER_GO:
     go_statement();
-    break;
+    return 0;
   case TOKENIZER_RETURN:
     return_statement();
     break;
@@ -1124,8 +1108,6 @@ static void statement(void)
     restore_statement();
     break;
   case TOKENIZER_LET:
-    accept_tok(TOKENIZER_LET);
-    /* Fall through. */
   case TOKENIZER_STRINGVAR:
   case TOKENIZER_INTVAR:
     let_statement();
@@ -1134,15 +1116,27 @@ static void statement(void)
     DEBUG_PRINTF("ubasic.c: statement(): not implemented %d\n", token);
     ubasic_error(syntax);
   }
+  return 1;
 }
+
+static void statements(void)
+{
+  uint8_t t;
+  while(statement()) {
+    t = accept_either(TOKENIZER_CR, TOKENIZER_COLON);
+    if (t == TOKENIZER_CR)
+      break;
+  }
+}
+
 /*---------------------------------------------------------------------------*/
-static void line_statement(void)
+static void line_statements(void)
 {
   line_num = tokenizer_num();
   DEBUG_PRINTF("----------- Line number %d ---------\n", line_num);
   index_add(line_num, tokenizer_pos());
   accept_tok(TOKENIZER_NUMBER);
-  statement();
+  statements();
   return;
 }
 /*---------------------------------------------------------------------------*/
@@ -1153,7 +1147,7 @@ void ubasic_run(void)
     return;
   }
 
-  line_statement();
+  line_statements();
 }
 /*---------------------------------------------------------------------------*/
 int ubasic_finished(void)

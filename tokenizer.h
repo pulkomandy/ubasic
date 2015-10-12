@@ -91,6 +91,7 @@ enum {
   TOKENIZER_GT = '>',
   TOKENIZER_EQ = '=',
   TOKENIZER_POWER = '^',
+  TOKENIZER_COLON = ':',
   TOKENIZER_CR = '\n'
 };
 
