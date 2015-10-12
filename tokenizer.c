@@ -160,7 +160,7 @@ static int get_next_token(void)
     nextptr = ptr;
     do {
       ++nextptr;
-      if (!*nextptr)
+      if (!*nextptr || *nextptr == '\n')
         ubasic_tokenizer_error();
     } while(*nextptr != '"');
     ++nextptr;
