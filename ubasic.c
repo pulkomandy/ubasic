@@ -2,6 +2,9 @@
  * Copyright (c) 2006, Adam Dunkels
  * All rights reserved.
  *
+ * Copyright (c) 2015, Alan Cox
+ * All rights reserved.
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -339,8 +342,14 @@ static void expr(struct typevalue *v)
     case TOKENIZER_PLUS:
       if (v->type == TYPE_INTEGER)
         v->d.i += t2.d.i;
-      else
-        /* FIXME - string cat */;
+      else {
+        uint8_t *p;
+        uint8_t l = *v->d.p;
+        p = string_temp(l + *t2.d.p);
+        memcpy(p + 1, v->d.p + 1, l);
+        memcpy(p + l + 1, t2.d.p + 1, *t2.d.p);
+        v->d.p = p;
+      }
       break;
     case TOKENIZER_MINUS:
       v->d.i -= t2.d.i;
