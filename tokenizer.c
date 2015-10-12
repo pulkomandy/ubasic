@@ -94,9 +94,24 @@ static const struct keyword_token keywords[] = {
 };
 
 /*---------------------------------------------------------------------------*/
-static int singlechar(void)
+static uint8_t doublechar(void)
 {
-  if (strchr("\n,;+-&|*/%(#)<>=", *ptr))
+  /* Special case the paired single char symbols */
+  if (*ptr == '>' && ptr[1] == '=')
+    return TOKENIZER_GE;
+  if (*ptr == '<' && ptr[1] == '=')
+    return TOKENIZER_LE;
+  if (*ptr == '<' && ptr[1] == '>')
+    return TOKENIZER_NE;
+  if (*ptr == '*' && ptr[1] == '*')
+    return TOKENIZER_POWER;
+  return 0;
+}
+
+/*---------------------------------------------------------------------------*/
+static uint8_t singlechar(void)
+{
+  if (strchr("\n,;+-&|*/%(#)<>=^", *ptr))
     return *ptr;
   /* Not semantically meaningful */
   return 0;
@@ -106,6 +121,7 @@ static int get_next_token(void)
 {
   struct keyword_token const *kt;
   int i;
+  uint8_t t;
 
   DEBUG_PRINTF("get_next_token(): '%s'\n", ptr);
 
@@ -134,9 +150,12 @@ static int get_next_token(void)
     }
     DEBUG_PRINTF("get_next_token: error due to too long number\n");
     return TOKENIZER_ERROR;
-  } else if(singlechar()) {
+  } else if((t = doublechar()) != 0) {
+    nextptr = ptr + 2;
+    return t;
+  } else if((t = singlechar()) != 0) {
     nextptr = ptr + 1;
-    return singlechar();
+    return t;
   } else if(*ptr == '"') {
     nextptr = ptr;
     do {

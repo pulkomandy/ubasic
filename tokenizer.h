@@ -56,6 +56,9 @@ enum {
   TOKENIZER_INPUT,
   TOKENIZER_RESTORE,
   TOKENIZER_TAB,
+  TOKENIZER_NE,
+  TOKENIZER_GE,
+  TOKENIZER_LE,
   TOKENIZER_NUMBER = 192,	/* Numeric expression types */
   TOKENIZER_INTVAR,
   TOKENIZER_PEEK,	
@@ -81,6 +84,7 @@ enum {
   TOKENIZER_LT = '<',
   TOKENIZER_GT = '>',
   TOKENIZER_EQ = '=',
+  TOKENIZER_POWER = '^',
   TOKENIZER_CR = '\n'
 };
 

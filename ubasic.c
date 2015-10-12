@@ -374,24 +374,72 @@ static void relation(struct typevalue *r1)
   expr(r1);
   op = tokenizer_token();
   DEBUG_PRINTF("relation: token %d\n", op);
+  /* FIXME: unclear the while is correct here. It's not correct in most
+     BASIC to write  A > B > C, rather relations should be two part linked
+     with logic */
   while(op == TOKENIZER_LT ||
        op == TOKENIZER_GT ||
-       op == TOKENIZER_EQ) {
+       op == TOKENIZER_EQ ||
+       op == TOKENIZER_NE ||
+       op == TOKENIZER_LE ||
+       op == TOKENIZER_GE) {
     tokenizer_next();
     expr(&r2);
     typecheck_same(r1, &r2);
     DEBUG_PRINTF("relation: %d %d %d\n", r1->d.i, op, r2.d.i);
-    switch(op) {
-    /* FIXME: string versions of these four */
-    case TOKENIZER_LT:
-      r1->d.i = r1->d.i < r2.d.i;
-      break;
-    case TOKENIZER_GT:
-      r1->d.i = r1->d.i > r2.d.i;
-      break;
-    case TOKENIZER_EQ:
-      r1->d.i = r1->d.i == r2.d.i;
-      break;
+    if (r1->type == TYPE_INTEGER) {
+      switch(op) {
+      case TOKENIZER_LT:
+        r1->d.i = r1->d.i < r2.d.i;
+        break;
+      case TOKENIZER_GT:
+        r1->d.i = r1->d.i > r2.d.i;
+        break;
+      case TOKENIZER_EQ:
+        r1->d.i = r1->d.i == r2.d.i;
+        break;
+      case TOKENIZER_LE:
+        r1->d.i = r1->d.i <= r2.d.i;
+        break;
+      case TOKENIZER_GE:
+        r1->d.i = r1->d.i >= r2.d.i;
+        break;
+      case TOKENIZER_NE:
+        r1->d.i = r1->d.i != r2.d.i;
+        break;
+      }
+    } else {
+      int n =*r1->d.p;
+      if (*r2.d.p < n)
+        n = *r2.d.p;
+      n = memcmp(r1->d.p + 1, r2.d.p + 1, n);
+      if (n == 0) {
+        if (*r1->d.p > *r2.d.p)
+          n = 1;
+        else if (*r1->d.p < *r2.d.p)
+          n = -1;
+      }
+      switch(op) {
+        case TOKENIZER_LT:
+          n = (n == -1);
+          break;
+        case TOKENIZER_GT:
+          n = (n == 1);
+          break;
+        case TOKENIZER_EQ:
+          n = (n == 0);
+          break;
+        case TOKENIZER_LE:
+          n = (n != 1);
+          break;
+        case TOKENIZER_GE:
+          n = (n != -1);
+          break;
+        case TOKENIZER_NE:
+          n = (n != 0);
+          break;
+      }
+      r1->d.i = n;
     }
     op = tokenizer_token();
   }
