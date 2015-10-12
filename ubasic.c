@@ -118,6 +118,25 @@ void ubasic_init_peek_poke(const char *program, peek_func peek, poke_func poke)
   ended = 0;
 }
 /*---------------------------------------------------------------------------*/
+void ubasic_error(const char *err)
+{
+  if (line_num)
+    fprintf(stderr, "Line %d: ", line_num);
+  fprintf(stderr, "%s error.\n", err);
+  exit(1);
+}
+static const char syntax[] = { "Syntax" };
+static const char badtype[] = { "Type mismatch" };
+static const char divzero[] = { "Division by zero" };
+static const char outofmemory[] = { "Out of memory" };
+
+/* Call back from the tokenizer on error */
+void ubasic_tokenizer_error(void)
+{
+  ubasic_error(syntax);
+}
+
+/*---------------------------------------------------------------------------*/
 static uint8_t accept_tok(uint8_t token)
 {
   if(token != tokenizer_token()) {
@@ -152,26 +171,20 @@ static void bracketed_expr(struct typevalue *v)
 /*---------------------------------------------------------------------------*/
 static void typecheck_int(struct typevalue *v)
 {
-  if (v->type != TYPE_INTEGER) {
-    fprintf(stderr, "Line %d Integer required\n", line_num);
-    exit(1);
-  }
+  if (v->type != TYPE_INTEGER)
+    ubasic_error(badtype);
 }
 /*---------------------------------------------------------------------------*/
 static void typecheck_string(struct typevalue *v)
 {
-  if (v->type != TYPE_STRING) {
-    fprintf(stderr, "Line %d String required\n", line_num);
-    exit(1);
-  }
+  if (v->type != TYPE_STRING)
+    ubasic_error(badtype);
 }
 /*---------------------------------------------------------------------------*/
 static void typecheck_same(struct typevalue *l, struct typevalue *r)
 {
-  if (l->type != r->type) {
-    fprintf(stderr, "Line %d Type mismatch\n", line_num);
-    exit(1);
-  }
+  if (l->type != r->type)
+    ubasic_error(badtype);
 }
 /*---------------------------------------------------------------------------*/
 /* Temoporary implementation of string workspaces */
@@ -182,15 +195,11 @@ static uint8_t *nextstr;
 static uint8_t *string_temp(int len)
 {
   uint8_t *p = nextstr;
-  if (len > 255) {
-    fprintf(stderr, "Line %d String too long\n", line_num);
-    exit(1);
-  }
+  if (len > 255)
+    ubasic_error("String too long");
   nextstr += len + 1;
-  if (nextstr > stringblob + sizeof(stringblob)) {
-    fprintf(stderr, "Line %d Out of string temporaries\n", line_num);
-    exit(1);
-  }
+  if (nextstr > stringblob + sizeof(stringblob))
+    ubasic_error("Out of temporary space");
   *p = len;
   return p;
 }
@@ -199,7 +208,6 @@ static void string_temp_free(void)
 {
   nextstr = stringblob;
 }
-
 /*---------------------------------------------------------------------------*/
 
 static value_t bracketed_intexpr(void)
@@ -225,7 +233,6 @@ static void factor(struct typevalue *v)
   DEBUG_PRINTF("factor: token %d\n", tokenizer_token());
   switch(t) {
   case TOKENIZER_STRING:
-    /* FIXME - allocate/copy */
     v->type = TYPE_STRING;
     len = tokenizer_string_len();
     v->d.p = string_temp(len);
@@ -269,13 +276,11 @@ static void factor(struct typevalue *v)
         if (v->d.i < 0) v->d.i = -1;
         break;
       default:
-        fprintf(stderr, "BOGOEXP\n");
+        ubasic_error("INT1");
       }
     }
-    else {
-      fprintf(stderr, "Line %d Syntax Error\n", line_num);
-      exit(1);
-    }
+    else
+      ubasic_error(syntax);
   }
 }
 
@@ -301,17 +306,13 @@ static void term(struct typevalue *v)
       v->d.i *= f2.d.i;
       break;
     case TOKENIZER_SLASH:
-      if (f2.d.i == 0) {
-        fprintf(stderr, "Line %d Division by zero\n", line_num);
-        exit(1);
-      }
+      if (f2.d.i == 0)
+        ubasic_error(divzero);
       v->d.i /= f2.d.i;
       break;
     case TOKENIZER_MOD:
-      if (f2.d.i == 0) {
-        fprintf(stderr, "Line %d Mod by zero\n", line_num);
-        exit(1);
-      }
+      if (f2.d.i == 0)
+        ubasic_error(divzero);
       v->d.i %= f2.d.i;
       break;
     }
@@ -579,7 +580,7 @@ static void go_statement(void)
     jump_linenum(linenum);
   } else {
     DEBUG_PRINTF("gosub_statement: gosub stack exhausted\n");
-    /* FIXME: error here */
+    ubasic_error("Return without gosub");
   }
 }
 /*---------------------------------------------------------------------------*/
@@ -650,8 +651,7 @@ static void print_statement(void)
       accept_tok(TOKENIZER_TAB);
       chartab(bracketed_intexpr());
     } else if (t != TOKENIZER_CR) {
-      printf("TOK type %c\n", t);
-      /* FIXME: Error out*/
+      ubasic_error(syntax);
       break;
     }
   } while(t != TOKENIZER_CR &&
@@ -742,13 +742,8 @@ static void next_statement(void)
       for_stack_ptr--;
       accept_tok(TOKENIZER_CR);
     }
-  } else {
-    fprintf(stderr, "Line %d: mismatched NEXT\n", line_num);
-    exit(1);
-    DEBUG_PRINTF("next_statement: non-matching next (expected %d, found %d)\n", for_stack[for_stack_ptr - 1].for_variable, var);
-    accept_tok(TOKENIZER_CR);
-  }
-
+  } else
+    ubasic_error("Mismatched NEXT");
 }
 /*---------------------------------------------------------------------------*/
 static void for_statement(void)
@@ -759,11 +754,11 @@ static void for_statement(void)
 
   accept_tok(TOKENIZER_FOR);
   for_variable = tokenizer_variable_num();
-  /* FIXME: typecheck the variable */
   accept_tok(TOKENIZER_INTVAR);
   accept_tok(TOKENIZER_EQ);
   expr(&t);
   typecheck_int(&t);
+  /* The set also typechecks the variable */
   ubasic_set_variable(for_variable, &t);
   accept_tok(TOKENIZER_TO);
   to = intexpr();
@@ -828,10 +823,8 @@ static void data_statement(void)
     /* Some platforms allow 4,,5  ... we don't yet FIXME */
     if (t == TOKENIZER_STRING || t == TOKENIZER_NUMBER)
       tokenizer_next();
-    else {
-      fprintf(stderr, "Line %d, syntax error\n", line_num);
-      exit(1);
-    }
+    else
+      ubasic_error(syntax);
     t = accept_either(TOKENIZER_CR, TOKENIZER_COMMA);
   } while(t != TOKENIZER_CR);
 }
@@ -861,10 +854,8 @@ static void option_statement(void)
   accept_tok(TOKENIZER_BASE);
   r = intexpr();
   accept_tok(TOKENIZER_CR);
-  if (r < 0 || r > 1) {
-    fprintf(stderr, "Line %d: Invalid base\n", line_num);
-    exit(1);
-  }
+  if (r < 0 || r > 1)
+    ubasic_error("Invalid base");
   array_base = r;
 }
 
@@ -919,7 +910,6 @@ static void input_statement(void)
 }
 
 /*---------------------------------------------------------------------------*/
-
 void restore_statement(void)
 {
   int linenum = 0;
@@ -999,10 +989,7 @@ static void statement(void)
     break;
   default:
     DEBUG_PRINTF("ubasic.c: statement(): not implemented %d\n", token);
-    if (line_num)
-      fprintf(stderr, "Line %d ", line_num);
-    fprintf(stderr, "Syntax error\n");
-    exit(1);
+    ubasic_error(syntax);
   }
 }
 /*---------------------------------------------------------------------------*/
@@ -1037,10 +1024,8 @@ int ubasic_finished(void)
 static uint8_t *string_save(uint8_t *p)
 {
   uint8_t *b = malloc(*p + 1);
-  if (b == NULL) {
-    fprintf(stderr, "Out of memory.\n");
-    exit(1);
-  }
+  if (b == NULL)
+    ubasic_error(outofmemory);
   memcpy(b, p, *p + 1);
   return b;
 }
@@ -1058,7 +1043,7 @@ void ubasic_set_variable(int varnum, struct typevalue *value)
     if(varnum >= 0 && varnum <= MAX_VARNUM)
       variables[varnum] = value->d.i;
     else {
-      fprintf(stderr, "BADVW\n");
+      ubasic_error("badsw");
       exit(1);
     }
   }
@@ -1072,9 +1057,7 @@ void ubasic_get_variable(int varnum, struct typevalue *value)
   } else if(varnum >= 0 && varnum <= MAX_VARNUM) {
     value->d.i = variables[varnum];
     value->type = TYPE_INTEGER;
-  } else {
-    fprintf(stderr, "BADVAR\n");
-    exit(1);
-  }
+  } else
+    ubasic_error("badv");
 }
 /*---------------------------------------------------------------------------*/

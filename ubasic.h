@@ -54,6 +54,7 @@ struct typevalue {
 void ubasic_init(const char *program);
 void ubasic_init_peek_poke(const char *program, peek_func peek, poke_func poke);
 void ubasic_run(void);
+void ubasic_tokenizer_error(void);
 int ubasic_finished(void);
 
 extern line_t line_num;

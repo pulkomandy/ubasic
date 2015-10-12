@@ -160,6 +160,8 @@ static int get_next_token(void)
     nextptr = ptr;
     do {
       ++nextptr;
+      if (!*nextptr)
+        ubasic_tokenizer_error();
     } while(*nextptr != '"');
     ++nextptr;
     return TOKENIZER_STRING;
@@ -265,11 +267,10 @@ int tokenizer_string_len(void)
     exit(1);
   }
   string_end = strchr(ptr + 1, '"');
-  if(string_end == NULL) {
-    /* Syntax error ? */
-    fprintf(stderr, "strlbotch2");
-    exit(1);
-  }
+  /* Pass -1 back so we can keep the notional split between the tokenizer
+     and core code cleaner */
+  if(string_end == NULL)
+    ubasic_tokenizer_error();
   return string_end - ptr - 1;
 }
 
@@ -289,22 +290,16 @@ void tokenizer_string_func(stringfunc_t func, void *ctx)
   }
   p = ptr + 1;
   string_end = strchr(p, '"');
-  if(string_end == NULL) {
-    return;
-  }
+  if(string_end == NULL)
+    ubasic_tokenizer_error();
   while(p != string_end)
     func(*p++, ctx);
 }
 
 /*---------------------------------------------------------------------------*/
-void
-tokenizer_error_print(void)
+void tokenizer_error_print(void)
 {
-  /* FIXME: print one line only */
-  if (line_num)
-    fprintf(stderr, "Line %d ", line_num);
-  fprintf(stderr, "Syntax error at '%s'\n", ptr);
-  DEBUG_PRINTF("tokenizer_error_print: '%s'\n", ptr);
+  ubasic_tokenizer_error();
 }
 /*---------------------------------------------------------------------------*/
 int
