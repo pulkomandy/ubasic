@@ -121,6 +121,8 @@ void ubasic_init_peek_poke(const char *program, peek_func peek, poke_func poke)
 /*---------------------------------------------------------------------------*/
 void ubasic_error(const char *err)
 {
+  fflush(stdout);
+  fprintf(stderr, "\n");
   if (line_num)
     fprintf(stderr, "Line %d: ", line_num);
   fprintf(stderr, "%s error.\n", err);
@@ -733,34 +735,56 @@ static void charoutstr(uint8_t *p)
     charout(*p++, NULL);
 }
 
+static void intout(value_t v)
+{
+  char buf[16];
+  char *p = buf;
+  snprintf(buf, 16, "%d", v);
+  while(*p)
+    charout(*p++, NULL);
+}
+
 static void print_statement(void)
 {
   uint8_t nonl;
   uint8_t t;
+  uint8_t nv = 0;
 
   accept_tok(TOKENIZER_PRINT);
   do {
     t = tokenizer_token();
     nonl = 0;
     DEBUG_PRINTF("Print loop\n");
-    if(t == TOKENIZER_STRING) {
-      /* Handle string const specially - length rules */
-      tokenizer_string_func(charout, NULL);
-      tokenizer_next();
-    } else if(TOKENIZER_STRINGEXP(t)) {
-      charoutstr(stringexpr());
-    } else if(t == TOKENIZER_COMMA) {
-      printf("\t");
+    if (nv == 0) {
+      if(t == TOKENIZER_STRING) {
+        /* Handle string const specially - length rules */
+        tokenizer_string_func(charout, NULL);
+        tokenizer_next();
+        nv = 1;
+        continue;
+      } else if(TOKENIZER_STRINGEXP(t)) {
+        charoutstr(stringexpr());
+        nv = 1;
+        continue;
+      } else if(TOKENIZER_NUMEXP(t)) {
+        intout(intexpr());
+        nv = 1;
+        continue;
+      } else if(t == TOKENIZER_TAB) {
+        nv = 1;
+        accept_tok(TOKENIZER_TAB);
+        chartab(bracketed_intexpr());
+        continue;
+      }
+    }
+    nv = 0;
+    if(t == TOKENIZER_COMMA) {
+      charout('\t', NULL);
       nonl = 1;
       tokenizer_next();
     } else if(t == TOKENIZER_SEMICOLON) {
       nonl = 1;
       tokenizer_next();
-    } else if(TOKENIZER_NUMEXP(t)) {
-      printf("%d", intexpr());
-    } else if(t == TOKENIZER_TAB) {
-      accept_tok(TOKENIZER_TAB);
-      chartab(bracketed_intexpr());
     } else if (t != TOKENIZER_CR) {
       ubasic_error(syntax);
       break;
@@ -768,7 +792,7 @@ static void print_statement(void)
   } while(t != TOKENIZER_CR &&
       t != TOKENIZER_ENDOFINPUT);
   if (!nonl)
-    printf("\n");
+    charout('\n', 0);
   DEBUG_PRINTF("End of print\n");
   tokenizer_next();
 }
