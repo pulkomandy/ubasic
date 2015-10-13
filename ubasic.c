@@ -80,6 +80,7 @@ static value_t variables[MAX_VARNUM];
 #define MAX_STRING 26
 static uint8_t *strings[MAX_STRING];
 static uint8_t nullstr[1] = { 0 };
+#define MAX_SUBSCRIPT 2
 
 static int ended;
 
@@ -296,11 +297,30 @@ static void funcexpr(struct typevalue *t, const char *f)
   accept_tok(TOKENIZER_RIGHTPAREN);
 }
 /*---------------------------------------------------------------------------*/
+static int parse_subscripts(struct typevalue *v)
+{
+    accept_tok(TOKENIZER_LEFTPAREN);
+    expr(v);
+    if (accept_either(TOKENIZER_COMMA, TOKENIZER_RIGHTPAREN) == TOKENIZER_COMMA) {
+      expr(++v);
+      accept_tok(TOKENIZER_RIGHTPAREN);
+      return 2;
+    }
+    return 1;
+}
+
+/*---------------------------------------------------------------------------*/
 static void varfactor(struct typevalue *v)
 {
-  ubasic_get_variable(tokenizer_variable_num(), v);
-  DEBUG_PRINTF("varfactor: obtaining %d from variable %d\n", v->d.i, tokenizer_variable_num());
+  var_t var = tokenizer_variable_num();
+  struct typevalue s[MAX_SUBSCRIPT];
+  int n= 0;
+  /* Sinclair style A$(2 TO 5) would also need to be parsed here if added */
   accept_either(TOKENIZER_INTVAR, TOKENIZER_STRINGVAR);
+  if (tokenizer_token() == TOKENIZER_LEFTPAREN)
+    n = parse_subscripts(s);
+  ubasic_get_variable(var, v, n, s);
+  DEBUG_PRINTF("varfactor: obtaining %d from variable %d\n", v->d.i, tokenizer_variable_num());
 }
 /*---------------------------------------------------------------------------*/
 static void factor(struct typevalue *v)
@@ -826,14 +846,18 @@ static void let_statement(void)
 {
   var_t var;
   struct typevalue v;
+  struct typevalue s[MAX_SUBSCRIPT];
+  int n;
 
   var = tokenizer_variable_num();
-
   accept_either(TOKENIZER_INTVAR, TOKENIZER_STRINGVAR);
+  if (tokenizer_token() == TOKENIZER_LEFTPAREN)
+    n = parse_subscripts(s);
+
   accept_tok(TOKENIZER_EQ);
   expr(&v);
   DEBUG_PRINTF("let_statement: assign %d to %d\n", var, v.d.i);
-  ubasic_set_variable(var, &v);
+  ubasic_set_variable(var, &v, n, s);
 }
 /*---------------------------------------------------------------------------*/
 static void return_statement(void)
@@ -861,9 +885,9 @@ static void next_statement(void)
   fs = &for_stack[for_stack_ptr - 1];
   if(for_stack_ptr > 0 &&
      var == fs->for_variable) {
-    ubasic_get_variable(var, &t);
+    ubasic_get_variable(var, &t, 0, NULL);
     t.d.i += fs->step;
-    ubasic_set_variable(var, &t);
+    ubasic_set_variable(var, &t, 0,NULL);
     /* NEXT end depends upon sign of STEP */
     if ((fs->step >= 0 && t.d.i <= fs->to) ||
         (fs->step < 0 && t.d.i >= fs->to))
@@ -886,7 +910,7 @@ static void for_statement(void)
   expr(&t);
   typecheck_int(&t);
   /* The set also typechecks the variable */
-  ubasic_set_variable(for_variable, &t);
+  ubasic_set_variable(for_variable, &t, 0, NULL);
   accept_tok(TOKENIZER_TO);
   to = intexpr();
   if (tokenizer_token() == TOKENIZER_STEP) {
@@ -1006,13 +1030,17 @@ static void input_statement(void)
 
   /* Consider the single var allowed version of INPUT - it's saner for
      strings by far ? */
-  do {  
+  do {
+    int n = 0;
+    struct typevalue s[MAX_SUBSCRIPT];
     if (!first)
       accept_either(TOKENIZER_COMMA, TOKENIZER_SEMICOLON);
     first = 0;
     t = tokenizer_token();
     v = tokenizer_variable_num();
     accept_either(TOKENIZER_INTVAR, TOKENIZER_STRINGVAR);
+    if (tokenizer_token() == TOKENIZER_LEFTPAREN)
+      n = parse_subscripts(s);
 
     if (fgets(buf + 1, 128, stdin) == NULL) {
       fprintf(stderr, "EOF\n");
@@ -1031,7 +1059,7 @@ static void input_statement(void)
       *((uint8_t *)buf) = l;
       r.d.p = (uint8_t *)buf;
     }
-    ubasic_set_variable(v, &r);
+    ubasic_set_variable(v, &r, n, s);
   } while(!statement_end());
   accept_tok(TOKENIZER_CR);
 }
@@ -1123,6 +1151,7 @@ static void statements(void)
 {
   uint8_t t;
   while(statement()) {
+    DEBUG_PRINTF("next statement %d\n", tokenizer_token());
     t = accept_either(TOKENIZER_CR, TOKENIZER_COLON);
     if (t == TOKENIZER_CR)
       break;
@@ -1167,7 +1196,8 @@ static uint8_t *string_save(uint8_t *p)
   return b;
 }
 
-void ubasic_set_variable(int varnum, struct typevalue *value)
+void ubasic_set_variable(int varnum, struct typevalue *value,
+                          int nsubs, struct typevalue *subs)
 {
   if (varnum & STRINGFLAG) {
     typecheck_string(value);
@@ -1186,7 +1216,8 @@ void ubasic_set_variable(int varnum, struct typevalue *value)
   }
 }
 /*---------------------------------------------------------------------------*/
-void ubasic_get_variable(int varnum, struct typevalue *value)
+void ubasic_get_variable(int varnum, struct typevalue *value,
+                                    int nsubs, struct typevalue *subs)
 {
   if (varnum & STRINGFLAG) {
     value->d.p = strings[varnum & ~STRINGFLAG];

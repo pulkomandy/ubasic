@@ -117,25 +117,25 @@ main(void)
 {
   struct typevalue v;
   run(program_let);
-  ubasic_get_variable(0, &v);
+  ubasic_get_variable(0, &v, 0, NULL);
   assert(v.d.i == 42 && v.type == TYPE_INTEGER);
 
   run(program_goto);
-  ubasic_get_variable(2, &v);
+  ubasic_get_variable(2, &v, 0, NULL);
   assert(v.d.i == 108 && v.type == TYPE_INTEGER);
 
   run(program_loop);
-  ubasic_get_variable(0, &v);
+  ubasic_get_variable(0, &v, 0, NULL);
   assert(v.d.i == ((value_t)(126 * 126 * 10)) && v.type == TYPE_INTEGER);
 
   run(program_fibs);
-  ubasic_get_variable(1, &v);
+  ubasic_get_variable(1, &v, 0, NULL);
   assert(v.d.i == 89 && v.type == TYPE_INTEGER);
 
   run(program_peek_poke);
-  ubasic_get_variable(0, &v);
+  ubasic_get_variable(0, &v, 0, NULL);
   assert(v.d.i == 123 && v.type == TYPE_INTEGER);
-  ubasic_get_variable(25, &v);
+  ubasic_get_variable(25, &v, 0, NULL);
   assert(v.d.i == 123 && v.type == TYPE_INTEGER);
 
   return 0;

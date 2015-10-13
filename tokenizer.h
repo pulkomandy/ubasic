@@ -99,6 +99,7 @@ enum {
 #define TOKENIZER_STRINGEXP(x)		(((x) & 0xE0) == 0xE0)
 
 #define STRINGFLAG	0x8000
+#define ARRAYFLAG	0x4000
 
 typedef void (*stringfunc_t)(char c, void *ctx);
 void tokenizer_goto(const char *program);

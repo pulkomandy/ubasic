@@ -59,7 +59,7 @@ int ubasic_finished(void);
 
 extern line_t line_num;
 
-void ubasic_get_variable(int varnum, struct typevalue *v);
-void ubasic_set_variable(int varum, struct typevalue *value);
+void ubasic_get_variable(int varnum, struct typevalue *v, int nsubs, struct typevalue *subs);
+void ubasic_set_variable(int varum, struct typevalue *value, int nsubs, struct typevalue *subs);
 
 #endif /* __UBASIC_H__ */

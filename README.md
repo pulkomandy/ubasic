@@ -42,6 +42,8 @@ In comparison with ECMA55, then apart from all the floaty stuff it's missing
 
 - IF operators for relation AND/OR relation are messed up
 - Arrays (1 or 2 dimensions required by ECMA55). Implicit dimensioning too
+	- dimensions are now parsed but ignored
+	- really needs a 'get var ptr' type op for for/next/let/input
 - The ^ operator (or ** equivalent)
 - RND
 - SQR
