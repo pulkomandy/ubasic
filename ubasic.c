@@ -77,9 +77,13 @@ struct line_index *line_index_current = NULL;
 
 #define MAX_VARNUM 26 * 11
 static value_t variables[MAX_VARNUM];
+static value_t variablesubs[26];
+static value_t vardim[26][2];
 #define MAX_STRING 26
 static uint8_t *strings[MAX_STRING];
 static uint8_t nullstr[1] = { 0 };
+static value_t stringsubs[MAX_STRING];
+static value_t stringdim[MAX_STRING][2];
 #define MAX_SUBSCRIPT 2
 
 static int ended;
@@ -134,6 +138,7 @@ static const char syntax[] = { "Syntax" };
 static const char badtype[] = { "Type mismatch" };
 static const char divzero[] = { "Division by zero" };
 static const char outofmemory[] = { "Out of memory" };
+static const char badsubscript[] = { "Subscript" };
 
 /* Call back from the tokenizer on error */
 void ubasic_tokenizer_error(void)
@@ -182,7 +187,6 @@ static void bracketed_expr(struct typevalue *v)
   expr(v);
   accept_tok(TOKENIZER_RIGHTPAREN);
 }
-
 /*---------------------------------------------------------------------------*/
 static void typecheck_int(struct typevalue *v)
 {
@@ -200,6 +204,13 @@ static void typecheck_same(struct typevalue *l, struct typevalue *r)
 {
   if (l->type != r->type)
     ubasic_error(badtype);
+}
+/*---------------------------------------------------------------------------*/
+static void range_check(struct typevalue *v, value_t top)
+{
+  typecheck_int(v);
+  if (v->d.i > top)
+    ubasic_error(badsubscript);
 }
 /*---------------------------------------------------------------------------*/
 /* Temoporary implementation of string workspaces */
@@ -1184,7 +1195,53 @@ int ubasic_finished(void)
   return ended || tokenizer_finished();
 }
 /*---------------------------------------------------------------------------*/
+void *ubasic_find_variable(int varnum, struct typevalue *value,
+                                    int nsubs, struct typevalue *subs)
+{
+  value_t *ap;
+  if (varnum & STRINGFLAG) {
+    varnum &= ~STRINGFLAG;
+    value->type = TYPE_STRING;
+    /* for now A$-Z$ only */
+    if (varnum > 25)
+      ubasic_error("invalid string");
+    if (stringsubs[varnum] != nsubs)
+      ubasic_error(badsubscript);
+    if (nsubs == 0)
+      return &strings[varnum];
+    ap = (value_t *)value->d.p;
+    range_check(subs, stringdim[varnum][0]);
+    if (nsubs == 1)
+      return &ap[subs->d.i];
+    range_check(subs+1, stringdim[varnum][1]);
+    return &ap[subs->d.i * stringdim[varnum][0] + subs[1].d.i];
+  } else if(varnum >= 0 && varnum <= MAX_VARNUM) {
+    value->type = TYPE_INTEGER;
+    if ((varnum > 25 && nsubs) || variablesubs[varnum] != nsubs)
+      ubasic_error(badsubscript);
+    if (nsubs == 0)
+      return &variables[varnum];
+    ap = (value_t *)value->d.p;
+    range_check(subs, vardim[varnum][0]);
+    if (nsubs == 1)
+      return &ap[subs->d.i];
+    range_check(subs+1, vardim[varnum][1]);
+    return &ap[subs->d.i * vardim[varnum][0] + subs[1].d.i];
+  } else
+    ubasic_error("badv");
+  exit(1);	/* To shut up gcc */
+}
 
+void ubasic_get_variable(int varnum, struct typevalue *value,
+                                    int nsubs, struct typevalue *subs)
+{
+  void *v = ubasic_find_variable(varnum, value, nsubs, subs);
+  if (value->type == TYPE_INTEGER)
+    value->d.i = *(value_t *)v;
+  else
+    value->d.p  = *(uint8_t **)v;
+}
+/*---------------------------------------------------------------------------*/
 /* This helper will change once we try and stamp out malloc but will do for
    the moment */
 static uint8_t *string_save(uint8_t *p)
@@ -1199,33 +1256,21 @@ static uint8_t *string_save(uint8_t *p)
 void ubasic_set_variable(int varnum, struct typevalue *value,
                           int nsubs, struct typevalue *subs)
 {
-  if (varnum & STRINGFLAG) {
+  void *p;
+  if (varnum & STRINGFLAG)
     typecheck_string(value);
-    varnum &= ~STRINGFLAG;
-    if (strings[varnum] != nullstr)
-      free(strings[varnum]);
-    strings[varnum] = string_save(value->d.p);
-  } else {
+  else
     typecheck_int(value);
-    if(varnum >= 0 && varnum <= MAX_VARNUM)
-      variables[varnum] = value->d.i;
-    else {
-      ubasic_error("badsw");
-      exit(1);
-    }
-  }
-}
-/*---------------------------------------------------------------------------*/
-void ubasic_get_variable(int varnum, struct typevalue *value,
-                                    int nsubs, struct typevalue *subs)
-{
+
+  p = ubasic_find_variable(varnum, value, nsubs, subs);
+  
   if (varnum & STRINGFLAG) {
-    value->d.p = strings[varnum & ~STRINGFLAG];
-    value->type = TYPE_STRING;
-  } else if(varnum >= 0 && varnum <= MAX_VARNUM) {
-    value->d.i = variables[varnum];
-    value->type = TYPE_INTEGER;
-  } else
-    ubasic_error("badv");
+    uint8_t **s = p;
+    if (*s != nullstr)
+      free(*s);
+    *s = string_save(value->d.p);
+  } else {
+    *(value_t *)p = value->d.i;
+  }
 }
 /*---------------------------------------------------------------------------*/
