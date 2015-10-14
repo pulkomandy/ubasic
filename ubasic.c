@@ -114,7 +114,7 @@ void ubasic_init(const char *program)
   data_position = program_ptr;
   data_seek = 1;
   ended = 0;
-  for (i = 0; i < 26; i++)
+  for (i = 0; i < MAX_STRING; i++)
     strings[i] = nullstr;
 }
 /*---------------------------------------------------------------------------*/
@@ -325,7 +325,7 @@ static void varfactor(struct typevalue *v)
 {
   var_t var = tokenizer_variable_num();
   struct typevalue s[MAX_SUBSCRIPT];
-  int n= 0;
+  int n = 0;
   /* Sinclair style A$(2 TO 5) would also need to be parsed here if added */
   accept_either(TOKENIZER_INTVAR, TOKENIZER_STRINGVAR);
   if (tokenizer_token() == TOKENIZER_LEFTPAREN)
@@ -858,7 +858,7 @@ static void let_statement(void)
   var_t var;
   struct typevalue v;
   struct typevalue s[MAX_SUBSCRIPT];
-  int n;
+  int n = 0;
 
   var = tokenizer_variable_num();
   accept_either(TOKENIZER_INTVAR, TOKENIZER_STRINGVAR);
