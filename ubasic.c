@@ -1029,11 +1029,11 @@ static void input_statement(void)
   int l;
   
   t = tokenizer_token();
-  if (TOKENIZER_STRINGEXP(t)) {
+  if (t == TOKENIZER_STRING) {
     tokenizer_string_func(charout, NULL);
     tokenizer_next();
     t = tokenizer_token();
-    first = 0;
+    accept_either(TOKENIZER_COMMA, TOKENIZER_SEMICOLON);
   } else {
     charout('?', NULL);
     charout(' ', NULL);
@@ -1072,7 +1072,6 @@ static void input_statement(void)
     }
     ubasic_set_variable(v, &r, n, s);
   } while(!statement_end());
-  accept_tok(TOKENIZER_CR);
 }
 
 /*---------------------------------------------------------------------------*/
