@@ -85,6 +85,7 @@ static const struct keyword_token keywords[] = {
   {"stop", TOKENIZER_STOP},
   {"and", TOKENIZER_AND},
   {"or", TOKENIZER_OR},
+  {"dim", TOKENIZER_DIM},
 /* FIXME  {"not", TOKENIZER_NOT}, */
   {"data", TOKENIZER_DATA},
   {"randomize", TOKENIZER_RANDOMIZE},
