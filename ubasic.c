@@ -76,15 +76,17 @@ struct line_index *line_index_head = NULL;
 struct line_index *line_index_current = NULL;
 
 #define MAX_VARNUM 26 * 11
-static value_t variables[MAX_VARNUM];
-static value_t variablesubs[26];
-static value_t vardim[26][2];
-#define MAX_STRING 26
-static uint8_t *strings[MAX_STRING];
-static uint8_t nullstr[1] = { 0 };
-static value_t stringsubs[MAX_STRING];
-static value_t stringdim[MAX_STRING][2];
 #define MAX_SUBSCRIPT 2
+#define MAX_STRING 26
+#define MAX_ARRAY 26
+static value_t variables[MAX_VARNUM];
+static uint8_t *vararrays[MAX_ARRAY];	/* Could union with variables FIXME ?*/
+static value_t variablesubs[MAX_ARRAY];
+static value_t vardim[MAX_ARRAY][MAX_SUBSCRIPT];
+static uint8_t *strings[MAX_STRING];
+static value_t stringsubs[MAX_STRING];
+static value_t stringdim[MAX_STRING][MAX_SUBSCRIPT];
+static uint8_t nullstr[1] = { 0 };
 
 static int ended;
 
@@ -139,6 +141,7 @@ static const char badtype[] = { "Type mismatch" };
 static const char divzero[] = { "Division by zero" };
 static const char outofmemory[] = { "Out of memory" };
 static const char badsubscript[] = { "Subscript" };
+static const char redimension[] = { "Redimension" };
 
 /* Call back from the tokenizer on error */
 void ubasic_tokenizer_error(void)
@@ -209,7 +212,7 @@ static void typecheck_same(struct typevalue *l, struct typevalue *r)
 static void range_check(struct typevalue *v, value_t top)
 {
   typecheck_int(v);
-  if (v->d.i > top)
+  if (v->d.i > top || v->d.i < array_base)
     ubasic_error(badsubscript);
 }
 /*---------------------------------------------------------------------------*/
@@ -1089,7 +1092,47 @@ void restore_statement(void)
     data_position = program_ptr;
   data_seek = 1;
 }
+/*---------------------------------------------------------------------------*/
+void dim_statement(void)
+{
+  var_t v = tokenizer_variable_num();
+  value_t s1,s2 = 1;
+  int n = 1;
+  
+  accept_either(TOKENIZER_STRINGVAR, TOKENIZER_INTVAR);
+  
+  /* For now A-Z/A-Z$ only */
+  if ((v & ~STRINGFLAG) > 25)
+    ubasic_error("invalid array name");
+  
+  accept_tok(TOKENIZER_LEFTPAREN);
+  s1 = intexpr();
+  if (accept_either(TOKENIZER_RIGHTPAREN, TOKENIZER_COMMA) == TOKENIZER_COMMA) {
+    s2 = intexpr();
+    accept_tok(TOKENIZER_RIGHTPAREN);
+  }
 
+  if (v & STRINGFLAG) {
+    uint8_t **p;
+    v &= ~STRINGFLAG;
+    if (stringsubs[v] || strings[v] != nullstr)
+      ubasic_error(redimension);
+    stringsubs[v] = n;
+    stringdim[v][0] = s1;
+    stringdim[v][1] = s2;
+    p = calloc(s1 * s2, sizeof(uint8_t *));
+    strings[v] = (uint8_t *)p;
+    for (n = 0; n < s1 * s2; n++)
+      *p++ = nullstr;
+  } else {
+    if (variablesubs[v])
+      ubasic_error(redimension);
+    variablesubs[v] = n;
+    vardim[v][0] = s1;
+    vardim[v][1] = s2;
+    vararrays[v] = calloc(s1 * s2, sizeof(uint8_t *));
+  }
+}	
 /*---------------------------------------------------------------------------*/
 static uint8_t statement(void)
 {
@@ -1145,6 +1188,9 @@ static uint8_t statement(void)
   case TOKENIZER_RESTORE:
     restore_statement();
     break;
+  case TOKENIZER_DIM:
+    dim_statement();
+    break;
   case TOKENIZER_LET:
   case TOKENIZER_STRINGVAR:
   case TOKENIZER_INTVAR:
@@ -1197,8 +1243,8 @@ int ubasic_finished(void)
 void *ubasic_find_variable(int varnum, struct typevalue *value,
                                     int nsubs, struct typevalue *subs)
 {
-  value_t *ap;
   if (varnum & STRINGFLAG) {
+    uint8_t **ap;
     varnum &= ~STRINGFLAG;
     value->type = TYPE_STRING;
     /* for now A$-Z$ only */
@@ -1208,19 +1254,20 @@ void *ubasic_find_variable(int varnum, struct typevalue *value,
       ubasic_error(badsubscript);
     if (nsubs == 0)
       return &strings[varnum];
-    ap = (value_t *)value->d.p;
+    ap = (uint8_t **)strings[varnum];
     range_check(subs, stringdim[varnum][0]);
     if (nsubs == 1)
       return &ap[subs->d.i];
     range_check(subs+1, stringdim[varnum][1]);
     return &ap[subs->d.i * stringdim[varnum][0] + subs[1].d.i];
   } else if(varnum >= 0 && varnum <= MAX_VARNUM) {
+    value_t *ap;
     value->type = TYPE_INTEGER;
     if ((varnum > 25 && nsubs) || variablesubs[varnum] != nsubs)
       ubasic_error(badsubscript);
     if (nsubs == 0)
       return &variables[varnum];
-    ap = (value_t *)value->d.p;
+    ap = (value_t *)vararrays[varnum];
     range_check(subs, vardim[varnum][0]);
     if (nsubs == 1)
       return &ap[subs->d.i];
