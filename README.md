@@ -37,13 +37,12 @@ Currently
 - Removed the existing IF THEN ELSE in favour of a traditional IF THEN and
   : usage (IF THEN IF THEN ELSE ELSE ... gets horrible to parse and the old
   code messed it up badly)
+- Arrays (1 or 2 dimensions required by ECMA55)
 
 In comparison with ECMA55, then apart from all the floaty stuff it's missing
 
+- Implicit dimensioning of arrays
 - IF operators for relation AND/OR relation are messed up
-- Arrays (1 or 2 dimensions required by ECMA55). Implicit dimensioning too
-	- dimensions are now parsed but ignored
-	- really needs a 'get var ptr' type op for for/next/let/input
 - The ^ operator (or ** equivalent)
 - RND
 - SQR

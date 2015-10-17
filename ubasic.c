@@ -1109,6 +1109,7 @@ void dim_statement(void)
   s1 = intexpr();
   if (accept_either(TOKENIZER_RIGHTPAREN, TOKENIZER_COMMA) == TOKENIZER_COMMA) {
     s2 = intexpr();
+    n = 2;
     accept_tok(TOKENIZER_RIGHTPAREN);
   }
 
