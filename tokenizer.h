@@ -93,6 +93,7 @@ enum {
   TOKENIZER_EQ = '=',
   TOKENIZER_POWER = '^',
   TOKENIZER_COLON = ':',
+  TOKENIZER_QUESTION = '?',
   TOKENIZER_CR = '\n'
 };
 

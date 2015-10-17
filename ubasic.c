@@ -1146,6 +1146,7 @@ static uint8_t statement(void)
     accept_tok(token);
 
   switch(token) {
+  case TOKENIZER_QUESTION:
   case TOKENIZER_PRINT:
     print_statement();
     break;

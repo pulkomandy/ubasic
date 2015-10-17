@@ -119,7 +119,7 @@ static uint8_t doublechar(void)
 /*---------------------------------------------------------------------------*/
 static uint8_t singlechar(void)
 {
-  if (strchr("\n,;+-&|*/%(#)<>=^:", *ptr))
+  if (strchr("\n,;+-&|*/%(#)<>=^:?", *ptr))
     return *ptr;
   /* Not semantically meaningful */
   return 0;
