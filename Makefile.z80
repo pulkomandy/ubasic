@@ -1,6 +1,6 @@
 all: tests use-ubasic ubx
 
-CFLAGS=-O2
+CFLAGS=-O2 -Dstatic=
 CC=fcc
 
 .SUFFIXES: .c .rel

@@ -50,21 +50,11 @@ void poke(value_t arg, value_t value) {
 
 /*---------------------------------------------------------------------------*/
 void run(const char program[]) {
-  clock_t start_t, end_t;
-  double delta_t;
-
-  start_t = clock();
-
   ubasic_init_peek_poke(program, &peek, &poke);
 
   do {
     ubasic_run();
   } while(!ubasic_finished());
-
-  end_t = clock();
-  delta_t = (double)(end_t - start_t) / CLOCKS_PER_SEC;
-
-  printf("done. Run time: %.3f s\n", delta_t);
 }
 
 /*---------------------------------------------------------------------------*/
