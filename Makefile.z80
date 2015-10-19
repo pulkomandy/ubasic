@@ -1,0 +1,30 @@
+all: tests use-ubasic ubx
+
+CFLAGS=-O2
+CC=fcc
+
+.SUFFIXES: .c .rel
+
+SRCS = ubx.c tests.c tokenizer.c ubasic. use-ubasic.c
+OBJS = $(SRCS:.c=.rel)
+
+tests: tests.rel ubasic.rel tokenizer.rel
+	$(CC) $(CFLAGS) $(PLATFORM) ubasic.rel tests.rel tokenizer.rel -o $@
+
+use-ubasic: use-ubasic.rel ubasic.rel tokenizer.rel
+	$(CC) $(CFLAGS) $(PLATFORM) ubasic.rel tokenizer.rel use-ubasic.rel -o $@
+
+ubx: ubx.rel ubasic.rel tokenizer.rel
+	$(CC) $(CFLAGS) $(PLATFORM) ubasic.rel tokenizer.rel ubx.rel -o $@
+
+clean:
+	rm -f *.rel tests use-ubasic ubx core *~ *.asm *.lst *.sym *.map *.noi *.lk *.ihx *.tmp *.bin
+
+ubx.c: ubasic.h
+tests.c: ubasic.h
+use-ubasic.c: ubasic.h
+ubasic.c: ubasic.h tokenizer.h
+tokenizer.c: ubasic.h tokenizer.h
+
+.c.rel:
+	$(CC) $(CFLAGS) -c $<
