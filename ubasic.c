@@ -152,21 +152,21 @@ void ubasic_tokenizer_error(void)
 /*---------------------------------------------------------------------------*/
 static uint8_t accept_tok(uint8_t token)
 {
-  if(token != tokenizer_token()) {
+  if(token != current_token) {
     DEBUG_PRINTF("Token not what was expected (expected %d, got %d)\n",
-                token, tokenizer_token());
+                token, current_token);
     tokenizer_error_print();
     exit(1);
   }
   DEBUG_PRINTF("Expected %d, got it\n", token);
   tokenizer_next();
   /* This saves lots of extra calls - return the new token */
-  return tokenizer_token();
+  return current_token;
 }
 /*---------------------------------------------------------------------------*/
 static uint8_t accept_either(uint8_t tok1, uint8_t tok2)
 {
-  uint8_t t = tokenizer_token();
+  uint8_t t = current_token;
   if (t == tok2)
     accept_tok(tok2);
   else
@@ -176,7 +176,7 @@ static uint8_t accept_either(uint8_t tok1, uint8_t tok2)
 /*---------------------------------------------------------------------------*/
 static int statement_end(void)
 {
-  uint8_t t = tokenizer_token();
+  uint8_t t = current_token;
   /* FIXME?? END OF FILE */
   if (t == TOKENIZER_CR || t == TOKENIZER_COLON)
     return 1;
@@ -331,7 +331,7 @@ static void varfactor(struct typevalue *v)
   int n = 0;
   /* Sinclair style A$(2 TO 5) would also need to be parsed here if added */
   accept_either(TOKENIZER_INTVAR, TOKENIZER_STRINGVAR);
-  if (tokenizer_token() == TOKENIZER_LEFTPAREN)
+  if (current_token == TOKENIZER_LEFTPAREN)
     n = parse_subscripts(s);
   ubasic_get_variable(var, v, n, s);
   DEBUG_PRINTF("varfactor: obtaining %d from variable %d\n", v->d.i, tokenizer_variable_num());
@@ -339,11 +339,11 @@ static void varfactor(struct typevalue *v)
 /*---------------------------------------------------------------------------*/
 static void factor(struct typevalue *v)
 {
-  uint8_t t = tokenizer_token();
+  uint8_t t = current_token;
   int len;
   struct typevalue arg[3];
 
-  DEBUG_PRINTF("factor: token %d\n", tokenizer_token());
+  DEBUG_PRINTF("factor: token %d\n", current_token);
   switch(t) {
   case TOKENIZER_STRING:
     v->type = TYPE_STRING;
@@ -449,7 +449,7 @@ static void term(struct typevalue *v)
   int op;
 
   factor(v);
-  op = tokenizer_token();
+  op = current_token;
   DEBUG_PRINTF("term: token %d\n", op);
   while(op == TOKENIZER_ASTR ||
        op == TOKENIZER_SLASH ||
@@ -474,7 +474,7 @@ static void term(struct typevalue *v)
       v->d.i %= f2.d.i;
       break;
     }
-    op = tokenizer_token();
+    op = current_token;
   }
   DEBUG_PRINTF("term: %d\n", v->d.i);
 }
@@ -485,7 +485,7 @@ static void expr(struct typevalue *v)
   int op;
 
   term(v);
-  op = tokenizer_token();
+  op = current_token;
   DEBUG_PRINTF("expr: token %d\n", op);
   while(op == TOKENIZER_PLUS ||
        op == TOKENIZER_MINUS ||
@@ -520,7 +520,7 @@ static void expr(struct typevalue *v)
       v->d.i |= t2.d.i;
       break;
     }
-    op = tokenizer_token();
+    op = current_token;
   }
   DEBUG_PRINTF("expr: %d\n", v->d.i);
 }
@@ -531,7 +531,7 @@ static void relation(struct typevalue *r1)
   int op;
 
   expr(r1);
-  op = tokenizer_token();
+  op = current_token;
   DEBUG_PRINTF("relation: token %d\n", op);
   /* FIXME: unclear the while is correct here. It's not correct in most
      BASIC to write  A > B > C, rather relations should be two part linked
@@ -600,7 +600,7 @@ static void relation(struct typevalue *r1)
       }
       r1->d.i = n;
     }
-    op = tokenizer_token();
+    op = current_token;
   }
   r1->type = TYPE_INTEGER;
 }
@@ -693,12 +693,12 @@ jump_linenum_slow(int linenum)
     do {
       do {
         tokenizer_next();
-      } while(tokenizer_token() != TOKENIZER_CR &&
-          tokenizer_token() != TOKENIZER_ENDOFINPUT);
-      if(tokenizer_token() == TOKENIZER_CR) {
+      } while(current_token != TOKENIZER_CR &&
+          current_token != TOKENIZER_ENDOFINPUT);
+      if(current_token == TOKENIZER_CR) {
         tokenizer_next();
       }
-    } while(tokenizer_token() != TOKENIZER_NUMBER);
+    } while(current_token != TOKENIZER_NUMBER);
     DEBUG_PRINTF("jump_linenum_slow: Found line %d\n", tokenizer_num());
   }
 }
@@ -798,7 +798,7 @@ static void print_statement(void)
   uint8_t nv = 0;
 
   do {
-    t = tokenizer_token();
+    t = current_token;
     nonl = 0;
     DEBUG_PRINTF("Print loop\n");
     if (nv == 0) {
@@ -865,7 +865,7 @@ static void let_statement(void)
 
   var = tokenizer_variable_num();
   accept_either(TOKENIZER_INTVAR, TOKENIZER_STRINGVAR);
-  if (tokenizer_token() == TOKENIZER_LEFTPAREN)
+  if (current_token == TOKENIZER_LEFTPAREN)
     n = parse_subscripts(s);
 
   accept_tok(TOKENIZER_EQ);
@@ -927,7 +927,7 @@ static void for_statement(void)
   ubasic_set_variable(for_variable, &t, 0, NULL);
   accept_tok(TOKENIZER_TO);
   to = intexpr();
-  if (tokenizer_token() == TOKENIZER_STEP) {
+  if (current_token == TOKENIZER_STEP) {
     accept_tok(TOKENIZER_STEP);
     step = intexpr();
   }
@@ -979,14 +979,14 @@ static void data_statement(void)
 {
   uint8_t t;
   do {
-    t = tokenizer_token();
+    t = current_token;
     /* We could just as easily allow expressions which might be wild... */
     /* Some platforms allow 4,,5  ... we don't yet FIXME */
     if (t == TOKENIZER_STRING || t == TOKENIZER_NUMBER)
       tokenizer_next();
     else
       ubasic_error(syntax);
-    t = tokenizer_token();
+    t = current_token;
     if (t == TOKENIZER_COMMA)
       accept_tok(t);
     else if (!statement_end())
@@ -1000,7 +1000,7 @@ static void randomize_statement(void)
   value_t r = 0;
   /* FIXME: replace all the CR checks with TOKENIZER_EOS() or similar so we
      can deal with ':' */
-  if (tokenizer_token() != TOKENIZER_CR)
+  if (current_token != TOKENIZER_CR)
     r = intexpr();
   if (r)
     srand(getpid()^getuid()^time(NULL));
@@ -1031,11 +1031,11 @@ static void input_statement(void)
   uint8_t first = 1;
   int l;
   
-  t = tokenizer_token();
+  t = current_token;
   if (t == TOKENIZER_STRING) {
     tokenizer_string_func(charout, NULL);
     tokenizer_next();
-    t = tokenizer_token();
+    t = current_token;
     accept_either(TOKENIZER_COMMA, TOKENIZER_SEMICOLON);
   } else {
     charout('?', NULL);
@@ -1050,10 +1050,10 @@ static void input_statement(void)
     if (!first)
       accept_either(TOKENIZER_COMMA, TOKENIZER_SEMICOLON);
     first = 0;
-    t = tokenizer_token();
+    t = current_token;
     v = tokenizer_variable_num();
     accept_either(TOKENIZER_INTVAR, TOKENIZER_STRINGVAR);
-    if (tokenizer_token() == TOKENIZER_LEFTPAREN)
+    if (current_token == TOKENIZER_LEFTPAREN)
       n = parse_subscripts(s);
 
     if (fgets(buf + 1, 128, stdin) == NULL) {
@@ -1141,7 +1141,7 @@ static uint8_t statement(void)
 
   string_temp_free();
 
-  token = tokenizer_token();
+  token = current_token;
   /* LET may be omitted.. */
   if (token != TOKENIZER_INTVAR && token != TOKENIZER_STRINGVAR)
     accept_tok(token);
@@ -1209,7 +1209,7 @@ static void statements(void)
 {
   uint8_t t;
   while(statement()) {
-    DEBUG_PRINTF("next statement %d\n", tokenizer_token());
+    DEBUG_PRINTF("next statement %d\n", current_token);
     t = accept_either(TOKENIZER_CR, TOKENIZER_COLON);
     if (t == TOKENIZER_CR)
       break;

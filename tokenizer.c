@@ -57,7 +57,7 @@ struct keyword_token {
   int token;
 };
 
-static int current_token = TOKENIZER_ERROR;
+uint8_t current_token = TOKENIZER_ERROR;
 
 static const struct keyword_token keywords[] = {
   {"let", TOKENIZER_LET},
@@ -125,7 +125,7 @@ static uint8_t singlechar(void)
   return 0;
 }
 /*---------------------------------------------------------------------------*/
-static int get_next_token(void)
+static uint8_t get_next_token(void)
 {
   struct keyword_token const *kt;
   int i;
@@ -209,11 +209,6 @@ void tokenizer_init(const char *program)
   current_token = get_next_token();
 }
 /*---------------------------------------------------------------------------*/
-int tokenizer_token(void)
-{
-  return current_token;
-}
-/*---------------------------------------------------------------------------*/
 void tokenizer_push(void)
 {
   saved_ptr = ptr;
@@ -267,7 +262,7 @@ int tokenizer_string_len(void)
 {
   char *string_end;
 
-  if(tokenizer_token() != TOKENIZER_STRING) {
+  if(current_token != TOKENIZER_STRING) {
     fprintf(stderr, "strlbotch");
     exit(1);
   }
@@ -290,7 +285,7 @@ void tokenizer_string_func(stringfunc_t func, void *ctx)
 {
   const char *string_end, *p;
 
-  if(tokenizer_token() != TOKENIZER_STRING) {
+  if(current_token != TOKENIZER_STRING) {
     return;
   }
   p = ptr + 1;
@@ -307,14 +302,12 @@ void tokenizer_error_print(void)
   ubasic_tokenizer_error();
 }
 /*---------------------------------------------------------------------------*/
-int
-tokenizer_finished(void)
+int tokenizer_finished(void)
 {
   return *ptr == 0 || current_token == TOKENIZER_ENDOFINPUT;
 }
 /*---------------------------------------------------------------------------*/
-int
-tokenizer_variable_num(void)
+int tokenizer_variable_num(void)
 {
   if (ptr[1] == '$')
     return STRINGFLAG | (toupper(*ptr) - 'A');
@@ -327,8 +320,7 @@ tokenizer_variable_num(void)
   }
 }
 /*---------------------------------------------------------------------------*/
-char const *
-tokenizer_pos(void)
+char const *tokenizer_pos(void)
 {
     return ptr;
 }

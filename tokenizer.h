@@ -108,7 +108,7 @@ void tokenizer_goto(const char *program);
 void tokenizer_init(const char *program);
 void tokenizer_next(void);
 void tokenizer_newline(void);
-int tokenizer_token(void);
+extern uint8_t current_token;
 value_t tokenizer_num(void);
 int tokenizer_variable_num(void);
 char const *tokenizer_string(void);
