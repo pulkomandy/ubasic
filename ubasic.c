@@ -105,6 +105,24 @@ static int data_seek;
 
 static unsigned int array_base = 0;
 
+#if defined(__linux__)
+
+const char *_itoa(int v)
+{
+  static char buf[16];
+  snprintf(buf, 16, "%d", v);
+  return buf;
+}
+
+const char *_uitoa(int v)
+{
+  static char buf[16];
+  snprintf(buf, 16, "%u", v);
+  return buf;
+}
+
+#endif
+
 /*---------------------------------------------------------------------------*/
 void ubasic_init(const char *program)
 {
@@ -129,11 +147,15 @@ void ubasic_init_peek_poke(const char *program, peek_func peek, poke_func poke)
 /*---------------------------------------------------------------------------*/
 void ubasic_error(const char *err)
 {
-  fflush(stdout);
-  fprintf(stderr, "\n");
-  if (line_num)
-    fprintf(stderr, "Line %d: ", line_num);
-  fprintf(stderr, "%s error.\n", err);
+  const char *p;
+  write(2, "\n", 1);
+  if (line_num) {
+    p = _uitoa(line_num);
+    write(2, p, strlen(p));
+    write(2, ": ", 2);
+  }
+  write(2, err, strlen(err));
+  write(2, " error.\n", 8);
   exit(1);
 }
 static const char syntax[] = { "Syntax" };
@@ -143,10 +165,15 @@ static const char outofmemory[] = { "Out of memory" };
 static const char badsubscript[] = { "Subscript" };
 static const char redimension[] = { "Redimension" };
 
+static void syntax_error(void)
+{
+  ubasic_error(syntax);
+}
+
 /* Call back from the tokenizer on error */
 void ubasic_tokenizer_error(void)
 {
-  ubasic_error(syntax);
+  syntax_error();
 }
 
 /*---------------------------------------------------------------------------*/
@@ -408,7 +435,7 @@ static void factor(struct typevalue *v)
         v->d.i = string_val(&arg[0]);
         break;
       default:
-        ubasic_error(syntax);
+        syntax_error();
       }
       v->type = TYPE_INTEGER;
     }
@@ -434,11 +461,11 @@ static void factor(struct typevalue *v)
         v->type = TYPE_STRING;
         break;
       default:
-        ubasic_error(syntax);
+        syntax_error();
       }
     }
     else
-      ubasic_error(syntax);
+      syntax_error();
   }
 }
 
@@ -726,13 +753,13 @@ static void go_statement(void)
   if (t == TOKENIZER_TO) {
     linenum = intexpr();
     if (!statement_end())
-      ubasic_error(syntax);
+      syntax_error();
     jump_linenum(linenum);
     return;
   }
   linenum = intexpr();
   if (!statement_end())
-    ubasic_error(syntax);
+    syntax_error();
 
   if(gosub_stack_ptr < MAX_GOSUB_STACK_DEPTH) {
     gosub_stack[gosub_stack_ptr] = tokenizer_pos();
@@ -755,7 +782,8 @@ static void charout(char c, void *unused)
     } while(chpos%8);
     return;
   }
-  putchar(c);
+  /* FIMXE: line buffer ! */
+  write(1, &c, 1);
   if ((c == 8 || c== 127) && chpos)
     chpos--;
   else if (c == '\r' || c == '\n')
@@ -784,9 +812,7 @@ static void charoutstr(uint8_t *p)
 
 static void intout(value_t v)
 {
-  char buf[16];
-  char *p = buf;
-  snprintf(buf, 16, "%d", v);
+  const char *p = _itoa(v);
   while(*p)
     charout(*p++, NULL);
 }
@@ -832,7 +858,7 @@ static void print_statement(void)
       nonl = 1;
       tokenizer_next();
     } else if (!statement_end()) {
-      ubasic_error(syntax);
+      syntax_error();
       break;
     }
   } while(!statement_end());
@@ -932,7 +958,7 @@ static void for_statement(void)
     step = intexpr();
   }
   if (!statement_end())
-    ubasic_error(syntax);
+    syntax_error();
   /* Save a pointer to the : or CR, when we return to statements it
      will do the right thing */
   if(for_stack_ptr < MAX_FOR_STACK_DEPTH) {
@@ -985,12 +1011,12 @@ static void data_statement(void)
     if (t == TOKENIZER_STRING || t == TOKENIZER_NUMBER)
       tokenizer_next();
     else
-      ubasic_error(syntax);
+      syntax_error();
     t = current_token;
     if (t == TOKENIZER_COMMA)
       accept_tok(t);
     else if (!statement_end())
-      ubasic_error(syntax);
+      syntax_error();
   } while(t != TOKENIZER_CR);
 }
 
@@ -998,13 +1024,15 @@ static void data_statement(void)
 static void randomize_statement(void)
 {
   value_t r = 0;
+  time_t t;
   /* FIXME: replace all the CR checks with TOKENIZER_EOS() or similar so we
      can deal with ':' */
   if (current_token != TOKENIZER_CR)
     r = intexpr();
-  if (r)
-    srand(getpid()^getuid()^time(NULL));
-  else
+  if (r == 0) {
+    time(&t);
+    srand(getpid()^getuid()^(unsigned int)t);
+  } else
     srand(r);
 }
 
@@ -1056,8 +1084,9 @@ static void input_statement(void)
     if (current_token == TOKENIZER_LEFTPAREN)
       n = parse_subscripts(s);
 
-    if (fgets(buf + 1, 128, stdin) == NULL) {
-      fprintf(stderr, "EOF\n");
+    /* FIXME: this works for stdin but not files .. */
+    if ((l = read(0, buf + 1, 128)) <= 0) {
+      write(2, "EOF\n", 4);
       exit(1);
     }
     charreset();		/* Newline input so move to left */
@@ -1067,8 +1096,7 @@ static void input_statement(void)
     } else {
       /* Turn a C string into a BASIC one */
       r.type = TYPE_STRING;
-      l = strlen(buf + 1);
-      if (buf[l] == '\n')
+      if (buf[l-1] == '\n')
         l--;
       *((uint8_t *)buf) = l;
       r.d.p = (uint8_t *)buf;
@@ -1200,7 +1228,7 @@ static uint8_t statement(void)
     break;
   default:
     DEBUG_PRINTF("ubasic.c: statement(): not implemented %d\n", token);
-    ubasic_error(syntax);
+    syntax_error();
   }
   return 1;
 }

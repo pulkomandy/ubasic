@@ -41,6 +41,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "ubasic.h"
 #include "tokenizer.h"
@@ -263,7 +264,7 @@ int tokenizer_string_len(void)
   char *string_end;
 
   if(current_token != TOKENIZER_STRING) {
-    fprintf(stderr, "strlbotch");
+    write(2, "strlbotch\n", 10);
     exit(1);
   }
   string_end = strchr(ptr + 1, '"');

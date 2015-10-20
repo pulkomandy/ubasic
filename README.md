@@ -38,6 +38,7 @@ Currently
   : usage (IF THEN IF THEN ELSE ELSE ... gets horrible to parse and the old
   code messed it up badly)
 - Arrays (1 or 2 dimensions required by ECMA55)
+- Stdio is not used
 
 In comparison with ECMA55, then apart from all the floaty stuff it's missing
 
@@ -49,6 +50,16 @@ In comparison with ECMA55, then apart from all the floaty stuff it's missing
 - DEF FN / FN (single or no variable required by ECMA55)
 - READ
 - Unquoted data strings
+
+Space saving work needed
+
+- Replace malloc() with a proper sbrk based basic allocator
+- Only prealloc A-Z/A$-Z$ pointers
+- Work out why factor and relation are so big - and shrink them
+- Why are input_statement and dim_statement so big ?
+- Maybe kill the line finding array
+- Fast way to walk lines
+- Pretokenize code to make smaller and faster
 
 Other useful stuff to add
 - XOR

@@ -2,6 +2,9 @@
  * Copyright (c) 2006, Adam Dunkels
  * All rights reserved.
  *
+ * Copyright (c) 2015, Alan Cox
+ * All rights reserved.
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -30,72 +33,71 @@
 #ifndef __TOKENIZER_H__
 #define __TOKENIZER_H__
 
-enum {
-  TOKENIZER_ERROR = 128,	/* Base of tokens */
-  TOKENIZER_ENDOFINPUT,
-  TOKENIZER_LET,
-  TOKENIZER_PRINT,
-  TOKENIZER_IF,
-  TOKENIZER_THEN,
-  TOKENIZER_ELSE,
-  TOKENIZER_FOR,
-  TOKENIZER_TO,
-  TOKENIZER_NEXT,
-  TOKENIZER_STEP,
-  TOKENIZER_GO,
-  TOKENIZER_SUB,
-  TOKENIZER_RETURN,
-  TOKENIZER_CALL,
-  TOKENIZER_REM,
-  TOKENIZER_POKE,
-  TOKENIZER_STOP,
-  TOKENIZER_DATA,
-  TOKENIZER_RANDOMIZE,
-  TOKENIZER_OPTION,
-  TOKENIZER_BASE,
-  TOKENIZER_INPUT,
-  TOKENIZER_RESTORE,
-  TOKENIZER_TAB,
-  TOKENIZER_NE,
-  TOKENIZER_GE,
-  TOKENIZER_LE,
-  TOKENIZER_DIM,
-  TOKENIZER_NUMBER = 192,	/* Numeric expression types */
-  TOKENIZER_INTVAR,
-  TOKENIZER_PEEK,	
-  TOKENIZER_INT,
-  TOKENIZER_ABS,
-  TOKENIZER_SGN,
-  TOKENIZER_LEN,
-  TOKENIZER_CODE,
-  TOKENIZER_VAL,
-  TOKENIZER_STRING = 224,	/* String expression types */
-  TOKENIZER_STRINGVAR,
-  TOKENIZER_LEFTSTR,
-  TOKENIZER_RIGHTSTR,
-  TOKENIZER_MIDSTR,
-  TOKENIZER_CHRSTR,
+#define TOKENIZER_ERROR		((uint8_t)128)		/* Base of tokens */
+#define TOKENIZER_ENDOFINPUT	((uint8_t)129)
+#define TOKENIZER_LET		((uint8_t)130)
+#define TOKENIZER_PRINT		((uint8_t)131)
+#define TOKENIZER_IF		((uint8_t)132)
+#define TOKENIZER_THEN		((uint8_t)133)
+#define TOKENIZER_ELSE		((uint8_t)134)
+#define TOKENIZER_FOR		((uint8_t)135)
+#define TOKENIZER_TO		((uint8_t)136)
+#define TOKENIZER_NEXT		((uint8_t)137)
+#define TOKENIZER_STEP		((uint8_t)138)
+#define TOKENIZER_GO		((uint8_t)139)
+#define TOKENIZER_SUB		((uint8_t)140)
+#define TOKENIZER_RETURN	((uint8_t)141)
+#define TOKENIZER_CALL		((uint8_t)142)
+#define TOKENIZER_REM		((uint8_t)143)
+#define TOKENIZER_POKE		((uint8_t)144)
+#define TOKENIZER_STOP		((uint8_t)145)
+#define TOKENIZER_DATA		((uint8_t)146)
+#define TOKENIZER_RANDOMIZE	((uint8_t)147)
+#define TOKENIZER_OPTION	((uint8_t)148)
+#define TOKENIZER_BASE		((uint8_t)149)
+#define TOKENIZER_INPUT		((uint8_t)150)
+#define TOKENIZER_RESTORE	((uint8_t)151)
+#define TOKENIZER_TAB		((uint8_t)152)
+#define TOKENIZER_NE		((uint8_t)153)
+#define TOKENIZER_GE		((uint8_t)154)
+#define TOKENIZER_LE		((uint8_t)155)
+#define TOKENIZER_DIM		((uint8_t)156)
+#define TOKENIZER_NUMBER	((uint8_t)192)	/* Numeric expression types */
+#define TOKENIZER_INTVAR	((uint8_t)193)
+#define TOKENIZER_PEEK		((uint8_t)194)
+#define TOKENIZER_INT		((uint8_t)195)
+#define TOKENIZER_ABS		((uint8_t)196)
+#define TOKENIZER_SGN		((uint8_t)197)
+#define TOKENIZER_LEN		((uint8_t)198)
+#define TOKENIZER_CODE		((uint8_t)199)
+#define TOKENIZER_VAL		((uint8_t)200)
+#define TOKENIZER_STRING	((uint8_t)224)	/* String expression types */
+#define TOKENIZER_STRINGVAR	((uint8_t)225)
+#define TOKENIZER_LEFTSTR	((uint8_t)226)
+#define TOKENIZER_RIGHTSTR	((uint8_t)227)
+#define TOKENIZER_MIDSTR	((uint8_t)228)
+#define TOKENIZER_CHRSTR	((uint8_t)229)
   /* Tokens that are single symbol assigned to themselves for efficiency */
-  TOKENIZER_COMMA = ',',
-  TOKENIZER_SEMICOLON = ';',
-  TOKENIZER_PLUS = '+',
-  TOKENIZER_MINUS = '-',
-  TOKENIZER_AND = '&',
-  TOKENIZER_OR = '|',
-  TOKENIZER_ASTR = '*',
-  TOKENIZER_SLASH = '/',
-  TOKENIZER_MOD = '%',
-  TOKENIZER_HASH = '#',
-  TOKENIZER_LEFTPAREN = '(',
-  TOKENIZER_RIGHTPAREN = ')',
-  TOKENIZER_LT = '<',
-  TOKENIZER_GT = '>',
-  TOKENIZER_EQ = '=',
-  TOKENIZER_POWER = '^',
-  TOKENIZER_COLON = ':',
-  TOKENIZER_QUESTION = '?',
-  TOKENIZER_CR = '\n'
-};
+#define TOKENIZER_COMMA		((uint8_t)',')
+#define TOKENIZER_SEMICOLON	((uint8_t)';')
+#define TOKENIZER_PLUS		((uint8_t)'+')
+#define TOKENIZER_MINUS		((uint8_t)'-')
+#define TOKENIZER_AND		((uint8_t)'&')
+#define TOKENIZER_OR		((uint8_t)'|')
+#define TOKENIZER_ASTR		((uint8_t)'*')
+#define TOKENIZER_SLASH		((uint8_t)'/')
+#define TOKENIZER_MOD		((uint8_t)'%')
+#define TOKENIZER_HASH		((uint8_t)'#')
+#define TOKENIZER_LEFTPAREN	((uint8_t)'(')
+#define TOKENIZER_RIGHTPAREN	((uint8_t)')')
+#define TOKENIZER_LT		((uint8_t)'<')
+#define TOKENIZER_GT		((uint8_t)'>')
+#define TOKENIZER_EQ		((uint8_t)'=')
+#define TOKENIZER_POWER		((uint8_t)'^')
+#define TOKENIZER_COLON		((uint8_t)':')
+#define TOKENIZER_QUESTION 	((uint8_t)'?')
+#define TOKENIZER_CR		((uint8_t)'\n')
+
 
 #define TOKENIZER_NUMEXP(x)		(((x) & 0xE0) == 0xC0)
 #define TOKENIZER_STRINGEXP(x)		(((x) & 0xE0) == 0xE0)

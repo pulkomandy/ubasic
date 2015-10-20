@@ -36,6 +36,9 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include "ubasic.h"
 
 /*---------------------------------------------------------------------------*/
@@ -59,28 +62,36 @@ void run(const char program[]) {
 
 /*---------------------------------------------------------------------------*/
 
-static char buf[16384];	/* eww */
+static char *buf;
 
 int main(int argc, char *argv[])
 {
   int fd, l;
+  struct stat s;
 
   if (argc != 2) {
-    fprintf(stderr, "%s: program\n", argv[0]);
+    write(2, argv[0], strlen(argv[0]));
+    write(2, ": program\n", 10);
     exit(1);
   }
   fd = open(argv[1], O_RDONLY);
-  if (fd == -1) {
+  if (fd == -1 || fstat(fd, &s) == -1) {
     perror(argv[1]);
     exit(1);
   }
-  l = read(fd, buf, 16384);
-  if (l == 16384) {
-    fprintf(stderr, "%s is too long\n", argv[1]);
+  /* Align to the next quad */
+  s.st_size |= 3;
+  buf = sbrk(s.st_size + 1);
+  if (buf == (char *)-1) {
+    write(2, "Out of memory.\n",15);
+    exit(1);
+  }
+  l = read(fd, buf, s.st_size);
+  if (l != s.st_size) {
+    perror(argv[1]);
     exit(1);
   }
   close(fd);
-  printf("Loaded %d bytes\n", l);
   buf[l] = 0;
   run(buf);
   return 0;
