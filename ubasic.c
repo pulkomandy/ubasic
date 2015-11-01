@@ -92,6 +92,7 @@ static int ended;
 
 static void expr(struct typevalue *val);
 static void line_statements(void);
+static void statementgroup(void);
 static void statements(void);
 static uint8_t statement(void);
 static void index_free(void);
@@ -506,24 +507,24 @@ static void term(struct typevalue *v)
   DEBUG_PRINTF("term: %d\n", v->d.i);
 }
 /*---------------------------------------------------------------------------*/
-static void expr(struct typevalue *v)
+static void mathexpr(struct typevalue *v)
 {
   struct typevalue t2;
   int op;
 
   term(v);
   op = current_token;
-  DEBUG_PRINTF("expr: token %d\n", op);
+  DEBUG_PRINTF("mathexpr: token %d\n", op);
   while(op == TOKENIZER_PLUS ||
        op == TOKENIZER_MINUS ||
-       op == TOKENIZER_AND ||
-       op == TOKENIZER_OR) {
+       op == TOKENIZER_BAND ||
+       op == TOKENIZER_BOR) {
     tokenizer_next();
     term(&t2);
     if (op != TOKENIZER_PLUS)
       typecheck_int(v);
     typecheck_same(v, &t2);
-    DEBUG_PRINTF("expr: %d %d %d\n", v->d.i, op, t2.d.i);
+    DEBUG_PRINTF("mathexpr: %d %d %d\n", v->d.i, op, t2.d.i);
     switch(op) {
     case TOKENIZER_PLUS:
       if (v->type == TYPE_INTEGER)
@@ -540,16 +541,16 @@ static void expr(struct typevalue *v)
     case TOKENIZER_MINUS:
       v->d.i -= t2.d.i;
       break;
-    case TOKENIZER_AND:
+    case TOKENIZER_BAND:
       v->d.i &= t2.d.i;
       break;
-    case TOKENIZER_OR:
+    case TOKENIZER_BOR:
       v->d.i |= t2.d.i;
       break;
     }
     op = current_token;
   }
-  DEBUG_PRINTF("expr: %d\n", v->d.i);
+  DEBUG_PRINTF("mathexpr: %d\n", v->d.i);
 }
 /*---------------------------------------------------------------------------*/
 static void relation(struct typevalue *r1)
@@ -557,7 +558,7 @@ static void relation(struct typevalue *r1)
   struct typevalue r2;
   int op;
 
-  expr(r1);
+  mathexpr(r1);
   op = current_token;
   DEBUG_PRINTF("relation: token %d\n", op);
   /* FIXME: unclear the while is correct here. It's not correct in most
@@ -570,7 +571,7 @@ static void relation(struct typevalue *r1)
        op == TOKENIZER_LE ||
        op == TOKENIZER_GE) {
     tokenizer_next();
-    expr(&r2);
+    mathexpr(&r2);
     typecheck_same(r1, &r2);
     DEBUG_PRINTF("relation: %d %d %d\n", r1->d.i, op, r2.d.i);
     if (r1->type == TYPE_INTEGER) {
@@ -626,6 +627,36 @@ static void relation(struct typevalue *r1)
           break;
       }
       r1->d.i = n;
+    }
+    op = current_token;
+  }
+  r1->type = TYPE_INTEGER;
+}
+/*---------------------------------------------------------------------------*/
+static void expr(struct typevalue *r1)
+{
+  struct typevalue r2;
+  int op;
+
+  relation(r1);
+  op = current_token;
+  DEBUG_PRINTF("logicrelation: token %d\n", op);
+  /* FIXME: unclear the while is correct here. It's not correct in most
+     BASIC to write  A > B > C, rather relations should be two part linked
+     with logic */
+  while(op == TOKENIZER_AND ||
+       op == TOKENIZER_OR) {
+    tokenizer_next();
+    relation(&r2);
+    /* No type checks needed on relations */
+    DEBUG_PRINTF("logicrelation: %d %d %d\n", r1->d.i, op, r2.d.i);
+    switch(op) {
+      case TOKENIZER_AND:
+        r1->d.i = r1->d.i & r2.d.i;
+        break;
+      case TOKENIZER_OR:
+        r1->d.i = r1->d.i | r2.d.i;
+        break;
     }
     op = current_token;
   }
@@ -871,12 +902,12 @@ static void if_statement(void)
 {
   struct typevalue r;
 
-  relation(&r);
+  expr(&r);
   DEBUG_PRINTF("if_statement: relation %d\n", r.d.i);
   /* FIXME allow THEN number */
   accept_tok(TOKENIZER_THEN);
   if(r.d.i) {
-    statements();
+    statementgroup();
   } else {
     tokenizer_newline();
   }
@@ -1233,15 +1264,23 @@ static uint8_t statement(void)
   return 1;
 }
 
-static void statements(void)
+static void statementgroup(void)
 {
   uint8_t t;
   while(statement()) {
     DEBUG_PRINTF("next statement %d\n", current_token);
-    t = accept_either(TOKENIZER_CR, TOKENIZER_COLON);
-    if (t == TOKENIZER_CR)
+    t = current_token;
+    if (t == TOKENIZER_COLON)
+      accept_tok(TOKENIZER_COLON);
+    else
       break;
   }
+}
+
+static void statements(void)
+{
+  statementgroup();
+  accept_tok(TOKENIZER_CR);
 }
 
 /*---------------------------------------------------------------------------*/

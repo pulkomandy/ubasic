@@ -99,6 +99,7 @@ static const struct keyword_token keywords[] = {
   {"right$", TOKENIZER_RIGHTSTR},
   {"mid$", TOKENIZER_MIDSTR},
   {"chr$", TOKENIZER_CHRSTR},
+  {"mod", TOKENIZER_MOD},
   {NULL, TOKENIZER_ERROR}
 };
 
@@ -120,7 +121,7 @@ static uint8_t doublechar(void)
 /*---------------------------------------------------------------------------*/
 static uint8_t singlechar(void)
 {
-  if (strchr("\n,;+-&|*/%(#)<>=^:?", *ptr))
+  if (strchr("\n,;+-&|*/(#)<>=^:?", *ptr))
     return *ptr;
   /* Not semantically meaningful */
   return 0;
