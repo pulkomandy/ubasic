@@ -39,11 +39,12 @@ Currently
   code messed it up badly)
 - Arrays (1 or 2 dimensions required by ECMA55)
 - Stdio is not used
+- Logical expressions with AND and OR differently priorities to boolean & |
+- Introduce "mod" to replace use of % - which we may need for other stuff later
 
 In comparison with ECMA55, then apart from all the floaty stuff it's missing
 
 - Implicit dimensioning of arrays
-- IF operators for relation AND/OR relation are messed up
 - The ^ operator (or ** equivalent)
 - RND
 - SQR
@@ -60,6 +61,7 @@ Space saving work needed
 - Maybe kill the line finding array
 - Fast way to walk lines
 - Pretokenize code to make smaller and faster
+- Switch to compiling ?
 
 Other useful stuff to add
 - XOR
