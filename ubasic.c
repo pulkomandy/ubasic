@@ -92,8 +92,8 @@ static int ended;
 
 static void expr(struct typevalue *val);
 static void line_statements(void);
-static void statementgroup(void);
 static void statements(void);
+static uint8_t statementgroup(void);
 static uint8_t statement(void);
 static void index_free(void);
 
@@ -783,8 +783,10 @@ static void go_statement(void)
   t = accept_either(TOKENIZER_TO, TOKENIZER_SUB);
   if (t == TOKENIZER_TO) {
     linenum = intexpr();
+    DEBUG_PRINTF("go_statement: go to %d.\n", linenum);
     if (!statement_end())
       syntax_error();
+    DEBUG_PRINTF("go_statement: jumping.\n");
     jump_linenum(linenum);
     return;
   }
@@ -1264,10 +1266,11 @@ static uint8_t statement(void)
   return 1;
 }
 
-static void statementgroup(void)
+static uint8_t statementgroup(void)
 {
   uint8_t t;
-  while(statement()) {
+  uint8_t n;
+  while((n = statement())) {
     DEBUG_PRINTF("next statement %d\n", current_token);
     t = current_token;
     if (t == TOKENIZER_COLON)
@@ -1275,12 +1278,13 @@ static void statementgroup(void)
     else
       break;
   }
+  return n;
 }
 
 static void statements(void)
 {
-  statementgroup();
-  accept_tok(TOKENIZER_CR);
+  if (statementgroup())
+    accept_tok(TOKENIZER_CR);
 }
 
 /*---------------------------------------------------------------------------*/
