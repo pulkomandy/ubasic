@@ -80,8 +80,7 @@ int main(int argc, char *argv[])
     exit(1);
   }
   /* Align to the next quad */
-  s.st_size |= 3;
-  buf = sbrk(s.st_size + 1);
+  buf = sbrk((s.st_size|3) + 1);
   if (buf == (char *)-1) {
     write(2, "Out of memory.\n",15);
     exit(1);
