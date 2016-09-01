@@ -71,6 +71,7 @@ static char *cl, *cm;
 static int rows, cols;
 static int tsave;
 static struct termios saved_termios;
+static struct termios tw;
 
 void ttyfix(void)
 {
@@ -91,7 +92,6 @@ static void visual_init(void)
   int s;
   pid_t pid;
   struct winsize w;
-  struct termios tw;
 
   if (ioctl(0, TIOCGWINSZ, &w)) {
     perror("tiocgwinsz");
@@ -171,6 +171,17 @@ int move_cursor(int x, int y)
   tputs(tgoto(cm, y, x), 2, outit);
   return 1;
 }
+
+void begin_input(void)
+{
+  ioctl(0, TCSETS, &saved_termios);
+}
+
+void end_input(void)
+{
+  ioctl(0, TCSETS, &tw);
+}
+
 #else
 
 void visual_init(void)
@@ -186,6 +197,14 @@ void clear_display(void)
 int move_cursor(int x, int y)
 {
   return 0;
+}
+
+void begin_input(void)
+{
+}
+
+void end_input(void)
+{
 }
 
 #endif

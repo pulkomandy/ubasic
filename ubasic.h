@@ -65,5 +65,7 @@ void ubasic_set_variable(int varum, struct typevalue *value, int nsubs, struct t
 /* Provided by user */
 void clear_display(void);
 int move_cursor(int x, int y);
+void begin_input(void);
+void end_input(void);
 
 #endif /* __UBASIC_H__ */

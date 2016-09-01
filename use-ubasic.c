@@ -53,6 +53,15 @@ int move_cursor(int x, int y)
   return 0;
 }
 
+void begin_input(void)
+{
+}
+
+void end_input(void)
+{
+}
+
+
 /*---------------------------------------------------------------------------*/
 int
 main(void)

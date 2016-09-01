@@ -1114,6 +1114,7 @@ static void input_statement(void)
     charout(' ', NULL);
   }
 
+  begin_input();
   /* Consider the single var allowed version of INPUT - it's saner for
      strings by far ? */
   do {
@@ -1147,6 +1148,7 @@ static void input_statement(void)
     }
     ubasic_set_variable(v, &r, n, s);
   } while(!statement_end());
+  end_input();
 }
 
 /*---------------------------------------------------------------------------*/
