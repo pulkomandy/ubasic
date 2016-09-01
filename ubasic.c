@@ -880,6 +880,16 @@ static void print_statement(void)
         accept_tok(TOKENIZER_TAB);
         chartab(bracketed_intexpr());
         continue;
+      } else if(t == TOKENIZER_AT) {
+        int x,y;
+        nv = 1;
+        accept_tok(TOKENIZER_AT);
+        y = intexpr();
+        accept_tok(TOKENIZER_COMMA);
+        x = intexpr();
+        if (move_cursor(x,y))
+          chpos = x;
+        continue;
       }
     }
     nv = 0;
@@ -899,6 +909,7 @@ static void print_statement(void)
     charout('\n', 0);
   DEBUG_PRINTF("End of print\n");
 }
+
 /*---------------------------------------------------------------------------*/
 static void if_statement(void)
 {
@@ -1153,6 +1164,15 @@ void restore_statement(void)
     data_position = program_ptr;
   data_seek = 1;
 }
+
+/*---------------------------------------------------------------------------*/
+
+void cls_statement(void)
+{
+  charreset();
+  clear_display();
+}
+
 /*---------------------------------------------------------------------------*/
 void dim_statement(void)
 {
@@ -1254,6 +1274,9 @@ static uint8_t statement(void)
   case TOKENIZER_DIM:
     dim_statement();
     break;
+  case TOKENIZER_CLS:
+    cls_statement();
+    break;
   case TOKENIZER_LET:
   case TOKENIZER_STRINGVAR:
   case TOKENIZER_INTVAR:
@@ -1297,6 +1320,8 @@ static void line_statements(void)
   statements();
   return;
 }
+/*---------------------------------------------------------------------------*/
+
 /*---------------------------------------------------------------------------*/
 void ubasic_run(void)
 {

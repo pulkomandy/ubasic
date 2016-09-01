@@ -65,6 +65,8 @@
 #define TOKENIZER_MOD		((uint8_t)157)
 #define TOKENIZER_AND		((uint8_t)158)
 #define TOKENIZER_OR		((uint8_t)159)
+#define TOKENIZER_AT		((uint8_t)160)
+#define TOKENIZER_CLS		((uint8_t)161)
 #define TOKENIZER_NUMBER	((uint8_t)192)	/* Numeric expression types */
 #define TOKENIZER_INTVAR	((uint8_t)193)
 #define TOKENIZER_PEEK		((uint8_t)194)

@@ -111,6 +111,17 @@ void run(const char program[]) {
   printf("done. Run time: %.3f s\n", delta_t);
 }
 
+
+void clear_display(void)
+{
+  write(1, "\012", 1);
+}
+
+int move_cursor(int x, int y)
+{
+  return 0;
+}
+
 /*---------------------------------------------------------------------------*/
 int
 main(void)

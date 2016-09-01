@@ -29,6 +29,7 @@
  */
 
 #include <stdint.h>
+#include <unistd.h>
 
 #include "ubasic.h"
 
@@ -41,6 +42,16 @@ static const char program[] =
 60 end\n\
 100 print \"subroutine\"\n\
 110 return\n";
+
+void clear_display(void)
+{
+  write(1, "\012", 1);
+}
+
+int move_cursor(int x, int y)
+{
+  return 0;
+}
 
 /*---------------------------------------------------------------------------*/
 int

@@ -1,6 +1,6 @@
 all: tests use-ubasic ubx
 
-CFLAGS=-O2 -Dstatic=
+CFLAGS=-O2 -Dstatic= -DVISUAL
 CC=fcc
 
 .SUFFIXES: .c .rel
@@ -15,7 +15,7 @@ use-ubasic: use-ubasic.rel ubasic.rel tokenizer.rel
 	$(CC) $(CFLAGS) $(PLATFORM) ubasic.rel tokenizer.rel use-ubasic.rel -o $@
 
 ubx: ubx.rel ubasic.rel tokenizer.rel
-	$(CC) $(CFLAGS) --nostdio $(PLATFORM) ubasic.rel tokenizer.rel ubx.rel -o $@
+	$(CC) $(CFLAGS) --nostdio $(PLATFORM) ubasic.rel tokenizer.rel ubx.rel -o $@ -ltermcap
 
 clean:
 	rm -f *.rel tests use-ubasic ubx core *~ *.asm *.lst *.sym *.map *.noi *.lk *.ihx *.tmp *.bin

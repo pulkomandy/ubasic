@@ -62,4 +62,8 @@ extern line_t line_num;
 void ubasic_get_variable(int varnum, struct typevalue *v, int nsubs, struct typevalue *subs);
 void ubasic_set_variable(int varum, struct typevalue *value, int nsubs, struct typevalue *subs);
 
+/* Provided by user */
+void clear_display(void);
+int move_cursor(int x, int y);
+
 #endif /* __UBASIC_H__ */

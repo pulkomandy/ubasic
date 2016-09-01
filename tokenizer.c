@@ -100,6 +100,8 @@ static const struct keyword_token keywords[] = {
   {"mid$", TOKENIZER_MIDSTR},
   {"chr$", TOKENIZER_CHRSTR},
   {"mod", TOKENIZER_MOD},
+  {"at", TOKENIZER_AT},
+  {"cls", TOKENIZER_CLS},
   {NULL, TOKENIZER_ERROR}
 };
 
