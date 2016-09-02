@@ -22,7 +22,7 @@ Currently
 - REM works as in normal BASIC
 - DATA and RESTORE are supported but not yet READ !
 - AND and OR keywords work (but not yet NOT)
-- GOTO and GOSUB allow expressions "computed GOTO")
+- GOTO and GOSUB allow expressions ("computed GOTO")
 - GO SUB and GO TO are two tokens so can be spaced
 - PRINT TAB() (SPC() is not ECMA55 nor is PRINT AT)
 - String variables (A$-Z$ required)
@@ -41,6 +41,8 @@ Currently
 - Stdio is not used
 - Logical expressions with AND and OR differently priorities to boolean & |
 - Introduce "mod" to replace use of % - which we may need for other stuff later
+- CLS
+- PRINT AT
 
 In comparison with ECMA55, then apart from all the floaty stuff it's missing
 
@@ -67,7 +69,6 @@ Other useful stuff to add
 - XOR
 - USR()
 - INKEY$
-- CLS
 - ON expr GO TO/SUB  ... {ELSE}
 - ON ERROR
 - ON TIMER/SIGNAL
