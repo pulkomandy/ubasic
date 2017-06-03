@@ -42,6 +42,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <setjmp.h>
 
 #include "ubasic.h"
 #include "tokenizer.h"
@@ -50,6 +51,8 @@ static char const *ptr, *nextptr;
 static char const *saved_ptr, *saved_next;
 static int saved_token;
 
+extern jmp_buf exception;
+#define exit(x) longjmp(exception, x)
 
 #define MAX_NUMLEN 6
 

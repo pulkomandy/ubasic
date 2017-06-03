@@ -1,0 +1,10 @@
+NAME = ubasic
+GAME_C_FILES = ubasic.c tokenizer.c bitbox.c \
+	lib/textmode/textmode.c \
+	lib/events/events.c \
+
+DEFINES += FONT_W=6 FONT_H=8
+
+BITBOX ?= ../sdk
+
+include $(BITBOX)/kernel/bitbox.mk

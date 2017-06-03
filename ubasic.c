@@ -43,12 +43,15 @@
 #include <stdlib.h> /* exit() */
 #include <stdint.h> /* Types */
 #include <string.h>
-#include <time.h>
 #include <ctype.h>
 #include <unistd.h>
+#include <setjmp.h>
 
 #include "ubasic.h"
 #include "tokenizer.h"
+
+jmp_buf exception;
+#define exit(x) longjmp(exception, x)
 
 static char const *program_ptr;
 
@@ -92,7 +95,7 @@ static int ended;
 
 static void expr(struct typevalue *val);
 static void line_statements(void);
-static void statements(void);
+void statements(void);
 static uint8_t statementgroup(void);
 static uint8_t statement(void);
 static void index_free(void);
@@ -105,8 +108,6 @@ static const char *data_position;
 static int data_seek;
 
 static unsigned int array_base = 0;
-
-#if defined(__linux__)
 
 const char *_itoa(int v)
 {
@@ -121,8 +122,6 @@ const char *_uitoa(int v)
   snprintf(buf, 16, "%u", v);
   return buf;
 }
-
-#endif
 
 /*---------------------------------------------------------------------------*/
 void ubasic_init(const char *program)
@@ -149,14 +148,14 @@ void ubasic_init_peek_poke(const char *program, peek_func peek, poke_func poke)
 void ubasic_error(const char *err)
 {
   const char *p;
-  write(2, "\n", 1);
+  charout('\n', NULL);
   if (line_num) {
     p = _uitoa(line_num);
-    write(2, p, strlen(p));
-    write(2, ": ", 2);
+    putstrz(p);
+    putstrz(": ");
   }
-  write(2, err, strlen(err));
-  write(2, " error.\n", 8);
+  putstrz(err);
+  putstrz(" error.\n");
   exit(1);
 }
 static const char syntax[] = { "Syntax" };
@@ -805,9 +804,24 @@ static void go_statement(void)
 }
 /*---------------------------------------------------------------------------*/
 
-static int chpos = 0;
+#include "lib/textmode/textmode.h"
 
-static void charout(char c, void *unused)
+static int chpos = 0, Y=0;
+extern uint8_t text_color;
+char cursor;
+
+void begin_input(void)
+{
+  cursor = 1;
+  vram_attr[Y][chpos] = cursor;
+}
+
+void end_input(void)
+{
+	cursor = 0;
+}
+
+void charout(char c, void *unused)
 {
   if (c == '\t') {
     do {
@@ -815,14 +829,29 @@ static void charout(char c, void *unused)
     } while(chpos%8);
     return;
   }
-  /* FIMXE: line buffer ! */
-  write(1, &c, 1);
+
   if ((c == 8 || c== 127) && chpos)
+  {
     chpos--;
+    vram[Y][chpos] = ' ';
+  }
+
   else if (c == '\r' || c == '\n')
-    chpos = 0;
-  else
+  {
+    vram_attr[Y][chpos] = 0;
+    chpos = 0; Y++;
+	if (Y > 40) {
+		clear();
+		Y = 0;
+	}
+  }
+  else {
+    vram[Y][chpos] = c;
     chpos++;
+  }
+  vram_attr[Y][chpos] = cursor;
+  vram_attr[Y][chpos-1] = 0;
+  vram_attr[Y][chpos+1] = 0;
 }
 
 static void charreset(void)
@@ -840,6 +869,12 @@ static void charoutstr(uint8_t *p)
 {
   int len =*p++;
   while(len--)
+    charout(*p++, NULL);
+}
+
+void putstrz(char* p)
+{
+  while(*p)
     charout(*p++, NULL);
 }
 
@@ -1068,15 +1103,16 @@ static void data_statement(void)
 static void randomize_statement(void)
 {
   value_t r = 0;
-  time_t t;
   /* FIXME: replace all the CR checks with TOKENIZER_EOS() or similar so we
      can deal with ':' */
   if (current_token != TOKENIZER_CR)
     r = intexpr();
+#if 0
   if (r == 0) {
     time(&t);
     srand(getpid()^getuid()^(unsigned int)t);
   } else
+#endif
     srand(r);
 }
 
@@ -1130,7 +1166,7 @@ static void input_statement(void)
       n = parse_subscripts(s);
 
     /* FIXME: this works for stdin but not files .. */
-    if ((l = read(0, buf + 1, 128)) <= 0) {
+    if ((l = _read(0, buf + 1, 128)) <= 0) {
       write(2, "EOF\n", 4);
       exit(1);
     }
@@ -1306,7 +1342,7 @@ static uint8_t statementgroup(void)
   return n;
 }
 
-static void statements(void)
+void statements(void)
 {
   if (statementgroup())
     accept_tok(TOKENIZER_CR);
